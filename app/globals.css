@@ -1,26 +1,115 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ── Architectural Studio Tokens (Ink & Titanium Ramp) ───────────────────────── */
+@theme {
+  --color-background: #090b10;
+  --color-foreground: #eceff4;
+  --color-card: #11141c;
+  --color-card-foreground: #eceff4;
+  --color-primary: #3b82f6;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #1a1e29;
+  --color-secondary-foreground: #d8dee9;
+  --color-muted: #1e2330;
+  --color-muted-foreground: #8892a6;
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #ffffff;
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-input: #151822;
+  --color-ring: #3b82f6;
+
+  /* Architectural Neutral Palette */
+  --color-slate-950: #07090e;
+  --color-slate-900: #0d1017;
+  --color-slate-850: #121620;
+  --color-slate-800: #181d2a;
+  --color-slate-700: #252c3f;
+  --color-slate-600: #384259;
+  --color-blue-500: #3b82f6;
+  --color-blue-600: #2563eb;
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* ── Base Layer ─────────────────────────────────────────────────────────────── */
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: #090b10;
+    color: #eceff4;
+    min-height: 100vh;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: #090b10; }
+  ::-webkit-scrollbar-thumb { background: #252c3f; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #3b82f6; }
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* ── Quiet Architectural Surfaces & Panels ─────────────────────────────────── */
+@layer utilities {
+  .surface-panel {
+    background: #0f121a;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 12px;
+  }
+
+  .surface-card {
+    background: #131722;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+  }
+
+  .surface-elevated {
+    background: #191f2e;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+  }
+
+  .badge-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: #94a3b8;
+    background: #161b26;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .badge-tag-accent {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: #60a5fa;
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.2);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* ── 3D Viewport Clean Styling ──────────────────────────────────────────────── */
+canvas {
+  touch-action: none;
+  outline: none;
 }
