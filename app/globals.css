@@ -1,42 +1,32 @@
 @import "tailwindcss";
 
-/* ── Architectural Studio Tokens (Ink & Titanium Ramp) ───────────────────────── */
+/* ── Atelier Tokens — Paper, Ink & Bronze ──────────────────────────────────── */
 @theme {
-  --color-background: #090b10;
-  --color-foreground: #eceff4;
-  --color-card: #11141c;
-  --color-card-foreground: #eceff4;
-  --color-primary: #3b82f6;
-  --color-primary-foreground: #ffffff;
-  --color-secondary: #1a1e29;
-  --color-secondary-foreground: #d8dee9;
-  --color-muted: #1e2330;
-  --color-muted-foreground: #8892a6;
-  --color-destructive: #ef4444;
-  --color-destructive-foreground: #ffffff;
-  --color-border: rgba(255, 255, 255, 0.08);
-  --color-input: #151822;
-  --color-ring: #3b82f6;
+  --color-paper: #f2efe8;
+  --color-paper-raised: #eae6dc;
+  --color-paper-sunken: #e6e1d4;
+  --color-ink: #1c1a16;
+  --color-ink-soft: #3d3931;
+  --color-ink-muted: #77705f;
+  --color-line: #d5cfc0;
+  --color-line-strong: #b9b1a0;
+  --color-brass: #8f6b32;
+  --color-brass-deep: #6f5225;
+  --color-signal: #b3541e;
 
-  /* Architectural Neutral Palette */
-  --color-slate-950: #07090e;
-  --color-slate-900: #0d1017;
-  --color-slate-850: #121620;
-  --color-slate-800: #181d2a;
-  --color-slate-700: #252c3f;
-  --color-slate-600: #384259;
-  --color-blue-500: #3b82f6;
-  --color-blue-600: #2563eb;
+  --color-viewport: #101318;
+  --color-viewport-panel: rgba(16, 19, 24, 0.85);
 
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 4px;
+
   --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-display: var(--font-fraunces), "Georgia", serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
-/* ── Base Layer ─────────────────────────────────────────────────────────────── */
+/* ── Base ──────────────────────────────────────────────────────────────────── */
 @layer base {
   *, *::before, *::after {
     box-sizing: border-box;
@@ -47,68 +37,108 @@
   }
 
   body {
-    background-color: #090b10;
-    color: #eceff4;
+    background-color: var(--color-paper);
+    color: var(--color-ink);
     min-height: 100vh;
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     overflow-x: hidden;
   }
 
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: #090b10; }
-  ::-webkit-scrollbar-thumb { background: #252c3f; border-radius: 3px; }
-  ::-webkit-scrollbar-thumb:hover { background: #3b82f6; }
+  ::selection {
+    background: var(--color-ink);
+    color: var(--color-paper);
+  }
+
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: var(--color-paper); }
+  ::-webkit-scrollbar-thumb { background: var(--color-line-strong); border-radius: 0; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--color-ink-muted); }
+
+  h1, h2, h3 {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+  }
 }
 
-/* ── Quiet Architectural Surfaces & Panels ─────────────────────────────────── */
+/* ── Atelier Surfaces ──────────────────────────────────────────────────────── */
 @layer utilities {
-  .surface-panel {
-    background: #0f121a;
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    border-radius: 12px;
+  /* Drawing-sheet panel: flat paper with a single hairline */
+  .sheet {
+    background: var(--color-paper);
+    border: 1px solid var(--color-line);
   }
 
-  .surface-card {
-    background: #131722;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 10px;
+  .sheet-raised {
+    background: var(--color-paper-raised);
+    border: 1px solid var(--color-line);
   }
 
-  .surface-elevated {
-    background: #191f2e;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
+  /* Dark instrument chrome that sits on top of the 3D viewport */
+  .vp-chip {
+    background: var(--color-viewport-panel);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(242, 239, 232, 0.14);
+    color: #d8d3c6;
   }
 
-  .badge-tag {
+  /* Small caps section label, like drawing annotations */
+  .annotation {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-ink-muted);
+  }
+
+  .annotation-brass {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-brass);
+  }
+
+  /* Solid ink primary action — no gradients */
+  .btn-ink {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 11px;
-    font-family: var(--font-mono);
-    color: #94a3b8;
-    background: #161b26;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    justify-content: center;
+    gap: 8px;
+    background: var(--color-ink);
+    color: var(--color-paper);
+    border: 1px solid var(--color-ink);
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+  .btn-ink:hover {
+    background: var(--color-brass-deep);
+    border-color: var(--color-brass-deep);
+  }
+  .btn-ink:disabled {
+    opacity: 0.45;
+    pointer-events: none;
   }
 
-  .badge-tag-accent {
+  .btn-outline {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 11px;
-    font-family: var(--font-mono);
-    color: #60a5fa;
-    background: rgba(59, 130, 246, 0.1);
-    border: 1px solid rgba(59, 130, 246, 0.2);
+    justify-content: center;
+    gap: 8px;
+    background: transparent;
+    color: var(--color-ink);
+    border: 1px solid var(--color-line-strong);
+    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+  }
+  .btn-outline:hover {
+    border-color: var(--color-ink);
+  }
+  .btn-outline:disabled {
+    opacity: 0.4;
+    pointer-events: none;
   }
 }
 
-/* ── 3D Viewport Clean Styling ──────────────────────────────────────────────── */
+/* ── 3D Viewport ───────────────────────────────────────────────────────────── */
 canvas {
   touch-action: none;
   outline: none;

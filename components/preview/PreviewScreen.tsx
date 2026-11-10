@@ -5,14 +5,7 @@ import { useStadiumStore } from '@/stores/stadiumStore';
 import { StadiumPreview3D } from '@/components/stadium-viewer/StadiumPreview3D';
 import { FACADE_STYLES, ROOF_TYPES, STADIUM_TYPES } from '@/constants/stadium';
 import { saveDesign } from '@/services/stadiumApi';
-import {
-  Save,
-  Pencil,
-  Share2,
-  Printer,
-  Check,
-  Loader2,
-} from 'lucide-react';
+import { Save, Pencil, Share2, Check, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function PreviewScreen() {
@@ -68,68 +61,65 @@ export function PreviewScreen() {
   ];
 
   return (
-    <div className="min-h-[calc(100vh-56px)] px-6 py-8 bg-[#07090f]">
+    <div className="min-h-[calc(100vh-64px)] px-6 py-10 bg-paper">
       <div className="max-w-[1400px] mx-auto">
-        <div className="mb-6">
-          <div className="text-[11px] font-mono text-blue-400 mb-1">Step 7 of 7 · Completion</div>
-          <h2 className="text-2xl font-bold text-white tracking-tight">
-            Your Stadium is Ready!
+        <div className="mb-8">
+          <div className="annotation-brass mb-3">04 — Completion</div>
+          <h2 className="text-3xl font-semibold text-ink tracking-tight">
+            Your stadium is ready
           </h2>
-          <p className="text-slate-400 text-xs">
-            Review your master architectural 3D stadium design, inspect details, and save or export.
+          <p className="text-ink-muted text-sm mt-2">
+            Review the final design, inspect the details, then save or export.
           </p>
         </div>
 
         <div className="grid lg:grid-cols-12 gap-6 items-start">
-          {/* Main 3D Viewport */}
-          <div className="lg:col-span-8 h-[520px] rounded-xl bg-[#0b0e18] border border-white/[0.08] relative overflow-hidden shadow-2xl shadow-blue-950/20">
+          {/* 3D viewport */}
+          <div className="lg:col-span-8 h-[520px] bg-viewport border border-ink/20 relative overflow-hidden">
             <StadiumPreview3D interactive={true} autoRotate={true} />
-            <div className="absolute top-4 left-5 text-xs font-mono text-slate-300 pointer-events-none bg-[#0a0f1d]/80 px-3 py-1.5 rounded border border-white/[0.08]">
+            <div className="absolute top-3 left-4 vp-chip px-3 py-1.5 text-xs font-mono text-paper/90 pointer-events-none">
               {config.name}
             </div>
-            <div className="absolute bottom-4 left-5 text-[11px] font-mono text-slate-400 pointer-events-none bg-[#0a0f1d]/80 px-3 py-1.5 rounded border border-white/[0.08]">
-              Drag to rotate · Scroll to zoom · Right-click to pan
+            <div className="absolute bottom-0 left-0 right-0 px-4 py-2.5 text-[10px] font-mono text-paper/50 pointer-events-none">
+              Drag rotate · Scroll zoom · Right-drag pan
             </div>
           </div>
 
-          {/* Design Summary Panel & Actions */}
-          <div className="lg:col-span-4 space-y-4">
-            <div className="p-5 rounded-xl bg-[#0d121e] border border-white/[0.08]">
-              <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/[0.08]">
+          {/* Spec sheet & actions */}
+          <div className="lg:col-span-4 space-y-5">
+            <div className="border border-ink bg-paper">
+              <div className="flex items-center justify-between px-5 py-3 border-b border-line">
                 <div>
-                  <h3 className="text-sm font-bold text-white">Design Summary</h3>
-                  <div className="text-[11px] text-slate-400">{config.name}</div>
+                  <h3 className="text-sm font-semibold text-ink">Design summary</h3>
+                  <div className="text-[11px] text-ink-muted">{config.name}</div>
                 </div>
-                <span className="text-[11px] font-mono text-blue-400 bg-blue-950/60 px-2 py-0.5 rounded border border-blue-500/30">
-                  {config.aiGenerated ? 'AI Assisted' : 'Manual Design'}
+                <span className="font-mono text-[10px] uppercase tracking-widest text-brass border border-brass/40 px-2 py-1">
+                  {config.aiGenerated ? 'AI assisted' : 'Manual'}
                 </span>
               </div>
 
-              <div className="space-y-2 text-xs">
+              <div className="px-5 py-2 text-xs">
                 {specifications.map((spec) => (
                   <div
                     key={spec.label}
-                    className="flex items-center justify-between py-1.5 border-b border-white/[0.04]"
+                    className="flex items-center justify-between py-2 border-b border-line/60 last:border-0"
                   >
-                    <span className="text-slate-400">{spec.label}</span>
-                    <span className="text-white font-mono capitalize">{spec.val}</span>
+                    <span className="text-ink-muted">{spec.label}</span>
+                    <span className="text-ink font-mono capitalize text-right">{spec.val}</span>
                   </div>
                 ))}
               </div>
 
-              <div className="mt-4 pt-3 border-t border-white/[0.06]">
-                <div className="text-[11px] text-slate-400 mb-2 font-medium">Architectural Color Palette:</div>
+              <div className="px-5 py-3 border-t border-line">
+                <div className="annotation mb-2">Palette</div>
                 <div className="flex gap-2">
                   {[
                     { color: config.materials.primaryColor, label: 'Primary' },
                     { color: config.materials.secondaryColor, label: 'Structure' },
                     { color: config.materials.accentColor, label: 'Accent' },
                   ].map(({ color, label }) => (
-                    <div key={label} className="flex items-center gap-1.5 text-[11px] text-slate-400">
-                      <div
-                        className="w-4 h-4 rounded border border-white/20"
-                        style={{ backgroundColor: color }}
-                      />
+                    <div key={label} className="flex items-center gap-1.5 text-[11px] text-ink-muted">
+                      <div className="w-4 h-4 border border-line-strong" style={{ backgroundColor: color }} />
                       <span>{label}</span>
                     </div>
                   ))}
@@ -137,12 +127,12 @@ export function PreviewScreen() {
               </div>
             </div>
 
-            {/* Action Buttons matching Step 7 in reference */}
+            {/* Actions */}
             <div className="space-y-2.5">
               <button
                 onClick={handleSave}
                 disabled={isSaving || saved}
-                className="w-full py-3 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold text-xs flex items-center justify-center gap-2 disabled:opacity-75 transition-all shadow-lg shadow-blue-600/30 active:scale-[0.99]"
+                className="btn-ink w-full py-3 text-sm font-semibold"
               >
                 {isSaving ? (
                   <>
@@ -152,31 +142,25 @@ export function PreviewScreen() {
                 ) : saved ? (
                   <>
                     <Check size={15} />
-                    <span>Design Saved Successfully!</span>
+                    <span>Design saved</span>
                   </>
                 ) : (
                   <>
                     <Save size={15} />
-                    <span>Save My Design</span>
+                    <span>Save my design</span>
                   </>
                 )}
               </button>
 
               <div className="grid grid-cols-2 gap-2.5">
-                <button
-                  onClick={handleEdit}
-                  className="py-2.5 rounded-lg bg-[#141b2a] hover:bg-[#1a2336] text-slate-200 text-xs font-medium border border-white/[0.08] flex items-center justify-center gap-1.5 transition-colors"
-                >
+                <button onClick={handleEdit} className="btn-outline py-2.5 text-xs font-medium">
                   <Pencil size={13} />
-                  <span>Back to Edit</span>
+                  <span>Back to edit</span>
                 </button>
 
-                <button
-                  onClick={handleShare}
-                  className="py-2.5 rounded-lg bg-[#141b2a] hover:bg-[#1a2336] text-slate-200 text-xs font-medium border border-white/[0.08] flex items-center justify-center gap-1.5 transition-colors"
-                >
+                <button onClick={handleShare} className="btn-outline py-2.5 text-xs font-medium">
                   <Share2 size={13} />
-                  <span>Print / Share</span>
+                  <span>Print / share</span>
                 </button>
               </div>
             </div>

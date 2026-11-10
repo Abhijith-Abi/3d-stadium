@@ -286,9 +286,13 @@ function DynamicLandscapeGround({ landscape }: { landscape?: LandscapeConfig }) 
 function MasterPitchAndTrack({
   type = 'football',
   pitchDesign = 'modern',
+  hasPlayerTunnel = true,
+  hasScoreboard = true,
 }: {
   type?: string;
   pitchDesign?: string;
+  hasPlayerTunnel?: boolean;
+  hasScoreboard?: boolean;
 }) {
   const lineMaterial = useMemo(() => new THREE.LineBasicMaterial({ color: '#ffffff', linewidth: 2 }), []);
 
@@ -381,50 +385,201 @@ function MasterPitchAndTrack({
         <meshBasicMaterial color="#ffffff" />
       </mesh>
 
-      {/* 3D Goals */}
+      {/* ── Professional Pitch Markings ── */}
+      {/* Penalty spots (11m from each goal line) */}
+      {[-41.5, 41.5].map((z, i) => (
+        <mesh key={`pspot-${i}`} rotation={[-Math.PI / 2, 0, 0]} position={[0, 1.03, z]}>
+          <circleGeometry args={[0.35, 20]} />
+          <meshBasicMaterial color="#ffffff" />
+        </mesh>
+      ))}
+
+      {/* Penalty arcs (9.15m radius around each spot, only outside the box) */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 1.03, -41.5]}>
+        <ringGeometry args={[8.95, 9.2, 32, 1, Math.PI * 7 / 6, Math.PI * 2 / 3]} />
+        <meshBasicMaterial color="#ffffff" side={THREE.DoubleSide} />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 1.03, 41.5]}>
+        <ringGeometry args={[8.95, 9.2, 32, 1, Math.PI / 6, Math.PI * 2 / 3]} />
+        <meshBasicMaterial color="#ffffff" side={THREE.DoubleSide} />
+      </mesh>
+
+      {/* Corner arcs */}
+      {[
+        { x: -34, z: -52.5, start: Math.PI * 1.5 },
+        { x: 34, z: -52.5, start: Math.PI },
+        { x: 34, z: 52.5, start: Math.PI * 0.5 },
+        { x: -34, z: 52.5, start: 0 },
+      ].map((c, i) => (
+        <mesh key={`carc-${i}`} rotation={[-Math.PI / 2, 0, 0]} position={[c.x, 1.03, c.z]}>
+          <ringGeometry args={[0.8, 1.0, 16, 1, c.start, Math.PI / 2]} />
+          <meshBasicMaterial color="#ffffff" side={THREE.DoubleSide} />
+        </mesh>
+      ))}
+
+      {/* ── 3D Goals with Real Nets ── */}
       {[[-52.5, 0], [52.5, Math.PI]].map(([gz, rot], i) => (
-        <group key={i} position={[0, 1.0, gz]} rotation={[0, rot, 0]}>
+        <group key={`goal-${i}`} position={[0, 1.0, gz]} rotation={[0, rot, 0]}>
+          {/* White goal frame */}
           <mesh position={[0, 2.44, 0]} rotation={[0, 0, Math.PI / 2]}>
-            <cylinderGeometry args={[0.08, 0.08, 7.32, 16]} />
+            <cylinderGeometry args={[0.09, 0.09, 7.32, 16]} />
             <meshStandardMaterial color="#ffffff" roughness={0.2} metalness={0.8} />
           </mesh>
           {[-3.66, 3.66].map((gx, j) => (
             <mesh key={j} position={[gx, 1.22, 0]}>
-              <cylinderGeometry args={[0.08, 0.08, 2.44, 16]} />
+              <cylinderGeometry args={[0.09, 0.09, 2.44, 16]} />
               <meshStandardMaterial color="#ffffff" roughness={0.2} metalness={0.8} />
             </mesh>
           ))}
-          <mesh position={[0, 1.22, -1.2]}>
-            <boxGeometry args={[7.32, 2.44, 2.4]} />
-            <meshStandardMaterial color="#ffffff" transparent opacity={0.2} wireframe />
+          {/* Rear ground frame */}
+          <mesh position={[0, 0.05, -1.9]} rotation={[0, 0, Math.PI / 2]}>
+            <cylinderGeometry args={[0.05, 0.05, 7.32, 10]} />
+            <meshStandardMaterial color="#ffffff" roughness={0.3} metalness={0.7} />
+          </mesh>
+          {/* Net: rear, roof and side panels */}
+          <mesh position={[0, 1.22, -1.85]}>
+            <planeGeometry args={[7.32, 2.44]} />
+            <meshBasicMaterial color="#ffffff" transparent opacity={0.22} side={THREE.DoubleSide} wireframe />
+          </mesh>
+          <mesh position={[0, 2.42, -0.95]} rotation={[Math.PI / 2.6, 0, 0]}>
+            <planeGeometry args={[7.32, 2.2]} />
+            <meshBasicMaterial color="#ffffff" transparent opacity={0.16} side={THREE.DoubleSide} wireframe />
+          </mesh>
+          {[-3.66, 3.66].map((gx, j) => (
+            <mesh key={`side-${j}`} position={[gx, 1.22, -0.95]} rotation={[0, Math.PI / 2, 0]}>
+              <planeGeometry args={[1.9, 2.44]} />
+              <meshBasicMaterial color="#ffffff" transparent opacity={0.14} side={THREE.DoubleSide} wireframe />
+            </mesh>
+          ))}
+        </group>
+      ))}
+
+      {/* ── Corner Flags ── */}
+      {[[-34, -52.5], [34, -52.5], [34, 52.5], [-34, 52.5]].map(([cx, cz], i) => (
+        <group key={`flag-${i}`} position={[cx, 1.0, cz]}>
+          <mesh position={[0, 0.75, 0]}>
+            <cylinderGeometry args={[0.04, 0.04, 1.5, 8]} />
+            <meshStandardMaterial color="#f8fafc" metalness={0.6} roughness={0.3} />
+          </mesh>
+          <mesh position={[0.22, 1.32, 0]} rotation={[0, i * Math.PI / 2, 0]}>
+            <planeGeometry args={[0.44, 0.3]} />
+            <meshStandardMaterial color="#f59e0b" side={THREE.DoubleSide} roughness={0.7} />
           </mesh>
         </group>
       ))}
 
-      {/* Digital Sideline Ribbon Boards */}
-      <group position={[0, 1.0, 0]}>
-        {[-37, 37].map((bx, i) => (
-          <mesh key={i} position={[bx, 0.5, 0]}>
-            <boxGeometry args={[0.5, 1.0, 110]} />
-            <meshStandardMaterial color="#0284c7" emissive="#0369a1" emissiveIntensity={0.6} roughness={0.3} />
+      {/* ── Animated Perimeter LED Ribbon Boards ── */}
+      <AnimatedLedRibbon />
+
+      {/* ── North Stand Scoreboard Tower ── */}
+      {hasScoreboard && (
+        <group position={[0, 1.0, -59]}>
+          {/* Steel support mast */}
+          <mesh position={[0, 6, -1.5]}>
+            <cylinderGeometry args={[0.35, 0.55, 12, 10]} />
+            <meshStandardMaterial color="#475569" metalness={0.9} roughness={0.25} />
           </mesh>
-        ))}
-      </group>
+          {/* Screen housing */}
+          <mesh position={[0, 12.5, 0]}>
+            <boxGeometry args={[16, 7, 1.2]} />
+            <meshStandardMaterial color="#020617" roughness={0.3} metalness={0.7} />
+          </mesh>
+          {/* Display face */}
+          <mesh position={[0, 12.5, 0.65]}>
+            <planeGeometry args={[15, 6.2]} />
+            <meshStandardMaterial color="#0f172a" emissive="#1d4ed8" emissiveIntensity={0.55} />
+          </mesh>
+          {/* Maintenance platform */}
+          <mesh position={[0, 8.6, 0]}>
+            <boxGeometry args={[17, 0.3, 2]} />
+            <meshStandardMaterial color="#334155" metalness={0.8} roughness={0.3} />
+          </mesh>
+        </group>
+      )}
+
+      {/* ── Player Tunnel Mouth ── */}
+      {hasPlayerTunnel && (
+        <group position={[0, 1.0, -56.5]}>
+          {/* Tunnel frame */}
+          <mesh position={[0, 1.5, -1]}>
+            <boxGeometry args={[6.5, 3, 3.6]} />
+            <meshStandardMaterial color="#1e293b" roughness={0.5} metalness={0.5} />
+          </mesh>
+          {/* Recessed opening */}
+          <mesh position={[0, 1.35, 0.85]}>
+            <boxGeometry args={[5, 2.7, 0.3]} />
+            <meshBasicMaterial color="#020617" />
+          </mesh>
+          {/* Illuminated crown strip */}
+          <mesh position={[0, 3.1, 0.85]}>
+            <boxGeometry args={[5.4, 0.25, 0.4]} />
+            <meshStandardMaterial color="#f8fafc" emissive="#38bdf8" emissiveIntensity={0.7} />
+          </mesh>
+        </group>
+      )}
 
       {/* Dugouts */}
       {[-12, 12].map((dx, i) => (
         <group key={i} position={[dx, 1.0, -56]}>
-          <mesh position={[0, 1.3, 0]}>
-            <boxGeometry args={[11, 2.4, 2.8]} />
-            <meshStandardMaterial color="#0f172a" transparent opacity={0.65} roughness={0.2} metalness={0.8} />
-          </mesh>
+          {/* Shell seats */}
           {[-4, -2, 0, 2, 4].map((sx, j) => (
-            <mesh key={j} position={[sx, 0.6, 0]}>
-              <boxGeometry args={[0.8, 0.8, 0.8]} />
-              <meshStandardMaterial color="#b91c1c" roughness={0.4} />
+            <mesh key={j} position={[sx, 0.55, 0.3]}>
+              <boxGeometry args={[1.1, 0.5, 0.9]} />
+              <meshStandardMaterial color={i === 0 ? '#b91c1c' : '#1d4ed8'} roughness={0.4} />
+            </mesh>
+          ))}
+          {/* Cantilevered transparent canopy */}
+          <mesh position={[0, 2.3, 0.4]}>
+            <boxGeometry args={[11, 0.15, 2.8]} />
+            <meshStandardMaterial color="#bae6fd" transparent opacity={0.35} roughness={0.05} metalness={0.6} />
+          </mesh>
+          {/* Rear acrylic windbreak */}
+          <mesh position={[0, 1.4, 1.7]}>
+            <boxGeometry args={[11, 1.8, 0.12]} />
+            <meshStandardMaterial color="#bae6fd" transparent opacity={0.3} roughness={0.05} metalness={0.6} />
+          </mesh>
+          {/* Steel frame legs */}
+          {[-5.2, 0, 5.2].map((fx, j) => (
+            <mesh key={j} position={[fx, 1.2, 1.6]}>
+              <cylinderGeometry args={[0.06, 0.06, 2.4, 8]} />
+              <meshStandardMaterial color="#475569" metalness={0.9} roughness={0.2} />
             </mesh>
           ))}
         </group>
+      ))}
+    </group>
+  );
+}
+
+// =============================================================================
+// 2b. ANIMATED PERIMETER LED RIBBON (Live color cycling)
+// =============================================================================
+function AnimatedLedRibbon() {
+  const matsRef = useRef<(THREE.MeshStandardMaterial | null)[]>([]);
+
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    matsRef.current.forEach((m, i) => {
+      if (m) {
+        const phase = Math.sin(t * 0.8 + i * Math.PI / 2) * 0.5 + 0.5;
+        m.emissive.setHSL(0.58 - phase * 0.13, 0.85, 0.42 + phase * 0.1);
+      }
+    });
+  });
+
+  return (
+    <group position={[0, 1.0, 0]}>
+      {[-37, 37].map((bx, i) => (
+        <mesh key={i} position={[bx, 0.5, 0]}>
+          <boxGeometry args={[0.5, 1.0, 110]} />
+          <meshStandardMaterial
+            ref={(m) => { matsRef.current[i] = m as THREE.MeshStandardMaterial | null; }}
+            color="#0c4a6e"
+            emissive="#0369a1"
+            emissiveIntensity={0.9}
+            roughness={0.3}
+          />
+        </mesh>
       ))}
     </group>
   );
@@ -1173,21 +1328,37 @@ function DynamicEnvironmentSky({
       })}
 
       {[
-        [46, 42, 46],
-        [-46, 42, 46],
-        [46, 42, -46],
-        [-46, 42, -46],
-      ].map(([x, y, z], i) => (
-        <group key={i} position={[x, y, z]}>
-          <pointLight intensity={isDay ? 80 : 260} distance={160} color={isCyber ? '#a5f3fc' : '#f0f9ff'} castShadow />
-          <mesh>
-            <boxGeometry args={[3.2, 3.2, 0.6]} />
-            <meshBasicMaterial color={isDay ? '#94a3b8' : '#ffffff'} />
+        [55, 0, 55],
+        [-55, 0, 55],
+        [55, 0, -55],
+        [-55, 0, -55],
+      ].map(([x, , z], i) => (
+        <group key={i} position={[x, 0.4, z]} rotation={[0, Math.atan2(-x, -z), 0]}>
+          {/* Lattice mast: central column with ring stiffeners */}
+          <mesh position={[0, 14, 0]} castShadow>
+            <cylinderGeometry args={[0.45, 0.95, 28, 10]} />
+            <meshStandardMaterial color="#64748b" metalness={0.9} roughness={0.3} />
           </mesh>
-          <mesh position={[0, -21, 0]}>
-            <cylinderGeometry args={[0.5, 1.1, 42, 8]} />
-            <meshStandardMaterial color="#334155" metalness={0.9} roughness={0.2} />
-          </mesh>
+          {[5, 11, 17, 23].map((y, j) => (
+            <mesh key={j} position={[0, y, 0]} rotation={[Math.PI / 2, 0, 0]}>
+              <torusGeometry args={[(0.95 - (y / 28) * 0.42) * 1.15, 0.07, 8, 20]} />
+              <meshStandardMaterial color="#94a3b8" metalness={0.9} roughness={0.3} />
+            </mesh>
+          ))}
+          {/* Head frame with lamp bank angled toward the pitch */}
+          <group position={[0, 29, 0]} rotation={[0.5, 0, 0]}>
+            <mesh castShadow>
+              <boxGeometry args={[6.5, 3.6, 0.7]} />
+              <meshStandardMaterial color="#334155" metalness={0.85} roughness={0.3} />
+            </mesh>
+            {Array.from({ length: 8 }).map((_, l) => (
+              <mesh key={l} position={[-2.4 + (l % 4) * 1.6, l < 4 ? 0.85 : -0.85, 0.42]}>
+                <boxGeometry args={[1.1, 1.1, 0.25]} />
+                <meshBasicMaterial color={isDay ? '#cbd5e1' : '#ffffff'} />
+              </mesh>
+            ))}
+          </group>
+          <pointLight position={[0, 26, 3]} intensity={isDay ? 40 : 210} distance={170} color={isCyber ? '#a5f3fc' : '#f0f9ff'} castShadow />
         </group>
       ))}
 
@@ -1206,9 +1377,12 @@ function DynamicEnvironmentSky({
 }
 
 // =============================================================================
-// 8. JUMBOTRON SCREENS & ADD-ONS
+// 8. JUMBOTRON SCREENS & ADD-ONS (Fan plaza, kiosks, solar)
 // =============================================================================
 function StadiumAddons({ config }: { config: StadiumConfig }) {
+  const hasFanZone = config.addons.hasFanZone;
+  const hasFoodCourts = config.addons.hasFoodCourts;
+
   return (
     <group>
       {config.addons.hasLedScreens && (
@@ -1229,17 +1403,110 @@ function StadiumAddons({ config }: { config: StadiumConfig }) {
                   <planeGeometry args={[15.2, 7.8]} />
                   <meshStandardMaterial color="#0284c7" emissive="#38bdf8" emissiveIntensity={0.8} />
                 </mesh>
+                {/* Anti-sway tension cables to the roof ring */}
+                {[-6, 6].map((cx, j) => (
+                  <mesh key={j} position={[cx, 5.6, 0]} rotation={[0, 0, cx > 0 ? -0.35 : 0.35]}>
+                    <cylinderGeometry args={[0.04, 0.04, 6, 6]} />
+                    <meshStandardMaterial color="#94a3b8" metalness={0.9} />
+                  </mesh>
+                ))}
               </group>
             );
           })}
         </group>
       )}
 
+      {/* Photovoltaic solar array on the south roof slope */}
       {config.addons.hasSolarPanels && (
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 27.8, 0]}>
-          <ringGeometry args={[52, 76, 48]} />
-          <meshStandardMaterial color="#0f172a" metalness={0.95} roughness={0.15} side={THREE.DoubleSide} />
-        </mesh>
+        <group rotation={[-Math.PI / 2, 0, 0]} position={[0, 27.6, 0]}>
+          {Array.from({ length: 4 }).map((_, ring) => (
+            <mesh key={ring}>
+              <ringGeometry args={[54 + ring * 5.5, 58 + ring * 5.5, 48]} />
+              <meshStandardMaterial color="#0f172a" metalness={0.95} roughness={0.15} side={THREE.DoubleSide} />
+            </mesh>
+          ))}
+        </group>
+      )}
+
+      {/* Fan plaza: merchandising & refreshment kiosks */}
+      {(hasFanZone || hasFoodCourts) && (
+        <group>
+          {Array.from({ length: 10 }).map((_, i) => {
+            const rad = (i * Math.PI * 2) / 10 + Math.PI / 10;
+            const r = hasFanZone ? 88 : 84;
+            const isFood = hasFoodCourts && i % 2 === 0;
+            return (
+              <group
+                key={i}
+                position={[Math.sin(rad) * r, 0.4, Math.cos(rad) * r]}
+                rotation={[0, -rad + Math.PI, 0]}
+              >
+                {/* Stall body */}
+                <mesh position={[0, 1.4, 0]} castShadow>
+                  <boxGeometry args={[4.2, 2.6, 2.4]} />
+                  <meshStandardMaterial color={isFood ? '#7c2d12' : '#1e293b'} roughness={0.6} metalness={0.2} />
+                </mesh>
+                {/* Serving counter */}
+                <mesh position={[0, 1.0, 1.45]}>
+                  <boxGeometry args={[4.2, 0.25, 0.8]} />
+                  <meshStandardMaterial color="#e7e5e4" roughness={0.5} />
+                </mesh>
+                {/* Pyramid awning */}
+                <mesh position={[0, 3.4, 0]} rotation={[0, Math.PI / 4, 0]} castShadow>
+                  <coneGeometry args={[3.2, 1.4, 4]} />
+                  <meshStandardMaterial color={isFood ? '#b45309' : '#334155'} roughness={0.55} />
+                </mesh>
+                {/* Warm stall light */}
+                <pointLight position={[0, 2.4, 1.4]} intensity={9} distance={14} color="#fbbf24" />
+              </group>
+            );
+          })}
+        </group>
+      )}
+    </group>
+  );
+}
+
+// =============================================================================
+// 8b. CEREMONIAL PLAZA FLAG ROW (Animated)
+// =============================================================================
+function PlazaFlagRow() {
+  const flagsRef = useRef<(THREE.Mesh | null)[]>([]);
+
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    flagsRef.current.forEach((f, i) => {
+      if (f) f.rotation.y = Math.sin(t * 1.6 + i * 0.7) * 0.28;
+    });
+  });
+
+  return (
+    <group>
+      {/* Flag avenue flanking the main south approach */}
+      {[-1, 1].map((side) =>
+        Array.from({ length: 5 }).map((_, i) => {
+          const key = `${side}-${i}`;
+          const z = 76 + i * 7;
+          return (
+            <group key={key} position={[side * 11, 0.4, z]}>
+              <mesh position={[0, 5, 0]} castShadow>
+                <cylinderGeometry args={[0.07, 0.1, 10, 8]} />
+                <meshStandardMaterial color="#e7e5e4" metalness={0.85} roughness={0.25} />
+              </mesh>
+              <mesh position={[0, 10, 0]}>
+                <sphereGeometry args={[0.12, 10, 10]} />
+                <meshStandardMaterial color="#fbbf24" metalness={0.9} roughness={0.2} />
+              </mesh>
+              <mesh
+                ref={(m) => { flagsRef.current[i * 2 + (side === 1 ? 0 : 1)] = m as THREE.Mesh | null; }}
+                position={[0.75, 9.1, 0]}
+              >
+                <planeGeometry args={[1.5, 1.0]} />
+                <meshStandardMaterial color="#b45309" side={THREE.DoubleSide} roughness={0.8} />
+              </mesh>
+            </group>
+          );
+        })
       )}
     </group>
   );
@@ -1258,7 +1525,12 @@ function MasterStadiumModel({ config }: { config: StadiumConfig }) {
       <DynamicLandscapeGround landscape={landscape} />
 
       {/* Football Pitch / Olympic Athletics Running Track */}
-      <MasterPitchAndTrack type={config.type} pitchDesign={config.interior.pitchDesign} />
+      <MasterPitchAndTrack
+        type={config.type}
+        pitchDesign={config.interior.pitchDesign}
+        hasPlayerTunnel={config.interior.hasPlayerTunnel}
+        hasScoreboard={config.interior.hasScoreboard}
+      />
 
       {/* Stepped Grandstand Bowl */}
       <RealisticGrandstands
@@ -1283,6 +1555,9 @@ function MasterStadiumModel({ config }: { config: StadiumConfig }) {
 
       {/* Jumbotrons, PV Solar & Add-Ons */}
       <StadiumAddons config={config} />
+
+      {/* Ceremonial flag avenue on the approach plaza */}
+      <PlazaFlagRow />
     </group>
   );
 }
@@ -1372,8 +1647,8 @@ export function StadiumPreview3D({
       {showQuickControls && (
         <div className="absolute top-3 right-4 z-20 flex flex-col gap-2 items-end pointer-events-auto">
           {/* Sky Atmosphere Selector */}
-          <div className="flex items-center gap-1 p-1 rounded-xl bg-[#090d18]/90 backdrop-blur-md border border-white/[0.08] shadow-xl">
-            <span className="text-[10px] font-mono text-slate-400 px-2 font-medium">Sky:</span>
+          <div className="flex items-center gap-0.5 p-1 vp-chip">
+            <span className="text-[9px] font-mono uppercase tracking-widest text-paper/40 px-2">Sky</span>
             {BACKGROUND_PRESETS.map((preset) => {
               const isActive = currentBg === preset.value;
               return (
@@ -1381,10 +1656,10 @@ export function StadiumPreview3D({
                   key={preset.value}
                   onClick={() => updateLandscape({ background: preset.value })}
                   title={`${preset.label}: ${preset.description}`}
-                  className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-all ${
+                  className={`flex items-center gap-1 px-2 py-1 text-xs transition-colors ${
                     isActive
-                      ? 'bg-blue-600 text-white font-semibold shadow-md shadow-blue-500/30'
-                      : 'text-slate-400 hover:text-white hover:bg-white/[0.06]'
+                      ? 'bg-brass text-paper font-medium'
+                      : 'text-paper/50 hover:text-paper hover:bg-white/[0.07]'
                   }`}
                 >
                   <span>{preset.icon}</span>
@@ -1395,8 +1670,8 @@ export function StadiumPreview3D({
           </div>
 
           {/* Landscape Style Selector */}
-          <div className="flex items-center gap-1 p-1 rounded-xl bg-[#090d18]/90 backdrop-blur-md border border-white/[0.08] shadow-xl">
-            <span className="text-[10px] font-mono text-slate-400 px-2 font-medium">Plaza:</span>
+          <div className="flex items-center gap-0.5 p-1 vp-chip">
+            <span className="text-[9px] font-mono uppercase tracking-widest text-paper/40 px-2">Plaza</span>
             {LANDSCAPE_STYLES.map((land) => {
               const isActive = currentLandscape === land.value;
               return (
@@ -1404,10 +1679,10 @@ export function StadiumPreview3D({
                   key={land.value}
                   onClick={() => updateLandscape({ landscapeStyle: land.value })}
                   title={`${land.label}: ${land.description}`}
-                  className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-all ${
+                  className={`flex items-center gap-1 px-2 py-1 text-xs transition-colors ${
                     isActive
-                      ? 'bg-indigo-600 text-white font-semibold shadow-md shadow-indigo-500/30'
-                      : 'text-slate-400 hover:text-white hover:bg-white/[0.06]'
+                      ? 'bg-paper text-ink font-medium'
+                      : 'text-paper/50 hover:text-paper hover:bg-white/[0.07]'
                   }`}
                 >
                   <span>{land.icon}</span>
@@ -1418,8 +1693,8 @@ export function StadiumPreview3D({
           </div>
 
           {/* Camera Presets: Aerial, Pitch, Entrance View */}
-          <div className="flex items-center gap-1 p-1 rounded-xl bg-[#090d18]/90 backdrop-blur-md border border-white/[0.08] shadow-xl">
-            <span className="text-[10px] font-mono text-slate-400 px-2 font-medium">View:</span>
+          <div className="flex items-center gap-0.5 p-1 vp-chip">
+            <span className="text-[9px] font-mono uppercase tracking-widest text-paper/40 px-2">View</span>
             {[
               { id: 'aerial' as const, label: 'Aerial', icon: Landmark },
               { id: 'pitch' as const, label: 'Pitch', icon: Camera },
@@ -1428,10 +1703,10 @@ export function StadiumPreview3D({
               <button
                 key={cam.id}
                 onClick={() => setActiveCam(cam.id)}
-                className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium transition-all ${
+                className={`flex items-center gap-1 px-2 py-1 text-[10px] font-medium transition-colors ${
                   activeCam === cam.id
-                    ? 'bg-slate-700 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-white hover:bg-white/[0.06]'
+                    ? 'bg-paper text-ink'
+                    : 'text-paper/50 hover:text-paper hover:bg-white/[0.07]'
                 }`}
               >
                 <cam.icon size={11} />

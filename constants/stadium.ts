@@ -47,9 +47,9 @@ export const DEFAULT_STADIUM_CONFIG: StadiumConfig = {
     treeDensity: 'medium',
   },
   materials: {
-    primaryColor: '#1e1b4b',
-    secondaryColor: '#6366f1',
-    accentColor: '#38bdf8',
+    primaryColor: '#1c1a16',
+    secondaryColor: '#8f6b32',
+    accentColor: '#b45309',
     finish: 'metallic',
     material: 'composite',
   },

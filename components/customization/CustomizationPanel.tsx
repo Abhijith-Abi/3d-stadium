@@ -30,23 +30,23 @@ function OptionCard({
     <button
       onClick={onClick}
       className={cn(
-        'w-full text-left p-3 rounded-lg border transition-colors relative group',
+        'w-full text-left p-3 border transition-colors relative group',
         selected
-          ? 'bg-[#182030] border-blue-500/50 text-white'
-          : 'bg-[#10141e] border-white/[0.06] text-slate-400 hover:bg-[#151a28] hover:text-slate-200'
+          ? 'border-ink bg-paper-raised text-ink'
+          : 'border-line bg-paper text-ink-muted hover:border-line-strong hover:text-ink-soft'
       )}
     >
       <div className="flex items-start gap-2.5">
         {colorHint && (
           <div
-            className="w-3.5 h-3.5 rounded-full shrink-0 mt-0.5 border border-white/20"
+            className="w-3.5 h-3.5 shrink-0 mt-0.5 border border-line-strong"
             style={{ backgroundColor: colorHint }}
           />
         )}
         <div className="flex-1 pr-5">{children}</div>
         {selected && (
-          <div className="absolute top-3 right-3 text-blue-400">
-            <Check size={14} />
+          <div className="absolute top-3 right-3 text-brass">
+            <Check size={14} strokeWidth={2.5} />
           </div>
         )}
       </div>
@@ -54,11 +54,12 @@ function OptionCard({
   );
 }
 
-function SectionHead({ title, subtitle }: { title: string; subtitle?: string }) {
+function SectionHead({ index, title, subtitle }: { index: string; title: string; subtitle?: string }) {
   return (
-    <div className="p-4 border-b border-white/[0.08] mb-4">
-      <h3 className="text-sm font-semibold text-white tracking-tight">{title}</h3>
-      {subtitle && <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>}
+    <div className="px-5 py-4 border-b border-line mb-4">
+      <div className="annotation-brass mb-1">{index}</div>
+      <h3 className="text-base font-semibold text-ink tracking-tight">{title}</h3>
+      {subtitle && <p className="text-xs text-ink-muted mt-1">{subtitle}</p>}
     </div>
   );
 }
@@ -67,19 +68,16 @@ function StadiumTypePanel() {
   const { config, updateConfig } = useStadiumStore();
   return (
     <div>
-      <SectionHead
-        title="Stadium Type"
-        subtitle="Select the primary stadium layout"
-      />
-      <div className="px-4 space-y-2">
+      <SectionHead index="01 / 08" title="Stadium Type" subtitle="Select the primary stadium layout" />
+      <div className="px-5 space-y-2">
         {STADIUM_TYPES.map((t) => (
           <OptionCard
             key={t.value}
             selected={config.type === t.value}
             onClick={() => updateConfig({ type: t.value })}
           >
-            <div className="text-xs font-medium text-white">{t.label}</div>
-            <div className="text-[11px] text-slate-400 mt-0.5">{t.description}</div>
+            <div className="text-xs font-medium text-ink">{t.label}</div>
+            <div className="text-[11px] text-ink-muted mt-0.5 leading-relaxed">{t.description}</div>
           </OptionCard>
         ))}
       </div>
@@ -88,13 +86,15 @@ function StadiumTypePanel() {
 }
 
 function FacadeThumbnailSvg({ style }: { style: string }) {
+  const ink = '#1c1a16';
+  const brass = '#8f6b32';
+  const muted = '#b9b1a0';
   switch (style) {
     case 'lattice':
       return (
         <svg viewBox="0 0 160 90" className="w-full h-full object-cover">
-          <rect width="160" height="90" fill="#090d16" />
-          <path d="M 0,90 Q 80,45 160,90 Z" fill="#d97706" opacity="0.45" />
-          {/* Diagrid crossing white beams */}
+          <rect width="160" height="90" fill="#efece4" />
+          <path d="M 0,90 Q 80,45 160,90 Z" fill="#d5cfc0" opacity="0.7" />
           {Array.from({ length: 9 }).map((_, i) => (
             <line
               key={`cw-${i}`}
@@ -102,8 +102,8 @@ function FacadeThumbnailSvg({ style }: { style: string }) {
               y1="90"
               x2={i * 24 + 40}
               y2="15"
-              stroke="#f8fafc"
-              strokeWidth="2.8"
+              stroke={ink}
+              strokeWidth="2.4"
               strokeLinecap="round"
             />
           ))}
@@ -114,52 +114,48 @@ function FacadeThumbnailSvg({ style }: { style: string }) {
               y1="90"
               x2={i * 24 - 20}
               y2="15"
-              stroke="#f1f5f9"
-              strokeWidth="2.8"
+              stroke={ink}
+              strokeWidth="2.4"
               strokeLinecap="round"
             />
           ))}
-          <path d="M 0,20 Q 80,8 160,20" stroke="#38bdf8" strokeWidth="2" fill="none" />
+          <path d="M 0,20 Q 80,8 160,20" stroke={brass} strokeWidth="2" fill="none" />
         </svg>
       );
     case 'slats':
       return (
         <svg viewBox="0 0 160 90" className="w-full h-full object-cover">
-          <rect width="160" height="90" fill="#0c0e14" />
-          <path d="M 0,90 Q 80,40 160,90 Z" fill="#78350f" opacity="0.6" />
+          <rect width="160" height="90" fill="#efece4" />
+          <path d="M 0,90 Q 80,40 160,90 Z" fill="#d5cfc0" opacity="0.8" />
           {Array.from({ length: 18 }).map((_, i) => (
             <path
               key={i}
               d={`M ${12 + i * 8},85 Q ${14 + i * 8},48 ${10 + i * 8},18`}
-              stroke={i % 2 === 0 ? '#d97706' : '#b45309'}
-              strokeWidth="3.2"
+              stroke={i % 2 === 0 ? ink : brass}
+              strokeWidth="3"
               fill="none"
               strokeLinecap="round"
             />
           ))}
-          <path d="M 0,18 Q 80,8 160,18" stroke="#ca8a04" strokeWidth="1.5" fill="none" />
         </svg>
       );
     case 'geometric':
       return (
         <svg viewBox="0 0 160 90" className="w-full h-full object-cover">
-          <rect width="160" height="90" fill="#0b0b14" />
-          {/* Triangular origami facet panels */}
-          <polygon points="10,80 30,25 50,80" fill="#a855f7" opacity="0.8" />
-          <polygon points="30,25 50,80 70,25" fill="#7e22ce" opacity="0.9" />
-          <polygon points="50,80 70,25 90,80" fill="#c084fc" opacity="0.75" />
-          <polygon points="70,25 90,80 110,25" fill="#6b21a8" opacity="0.9" />
-          <polygon points="90,80 110,25 130,80" fill="#9333ea" opacity="0.8" />
-          <polygon points="110,25 130,80 150,25" fill="#c084fc" opacity="0.7" />
-          <path d="M 0,25 Q 80,12 160,25" stroke="#e9d5ff" strokeWidth="1.5" fill="none" />
+          <rect width="160" height="90" fill="#efece4" />
+          <polygon points="10,80 30,25 50,80" fill="#8f6b32" opacity="0.85" />
+          <polygon points="30,25 50,80 70,25" fill="#6f5225" opacity="0.9" />
+          <polygon points="50,80 70,25 90,80" fill="#b3541e" opacity="0.75" />
+          <polygon points="70,25 90,80 110,25" fill="#8f6b32" opacity="0.9" />
+          <polygon points="90,80 110,25 130,80" fill="#6f5225" opacity="0.8" />
+          <polygon points="110,25 130,80 150,25" fill="#b3541e" opacity="0.7" />
         </svg>
       );
     case 'perforated':
       return (
         <svg viewBox="0 0 160 90" className="w-full h-full object-cover">
-          <rect width="160" height="90" fill="#080e18" />
-          <path d="M 5,85 Q 80,30 155,85 Z" fill="#0369a1" opacity="0.5" />
-          {/* Array of stippled parametric apertures */}
+          <rect width="160" height="90" fill="#efece4" />
+          <path d="M 5,85 Q 80,30 155,85 Z" fill="#d5cfc0" opacity="0.9" />
           {Array.from({ length: 7 }).map((_, r) =>
             Array.from({ length: 14 }).map((_, c) => (
               <circle
@@ -167,19 +163,18 @@ function FacadeThumbnailSvg({ style }: { style: string }) {
                 cx={15 + c * 10}
                 cy={25 + r * 8}
                 r={1.2 + ((c % 3) * 0.5)}
-                fill="#38bdf8"
-                opacity={0.85}
+                fill={ink}
+                opacity={0.8}
               />
             ))
           )}
-          <path d="M 0,22 Q 80,10 160,22" stroke="#38bdf8" strokeWidth="2" fill="none" />
         </svg>
       );
     case 'glass':
       return (
         <svg viewBox="0 0 160 90" className="w-full h-full object-cover">
-          <rect width="160" height="90" fill="#061224" />
-          <path d="M 0,85 Q 80,35 160,85 Z" fill="#0284c7" opacity="0.4" />
+          <rect width="160" height="90" fill="#e6e1d4" />
+          <path d="M 0,85 Q 80,35 160,85 Z" fill="#b9b1a0" opacity="0.7" />
           {Array.from({ length: 12 }).map((_, i) => (
             <line
               key={i}
@@ -187,22 +182,22 @@ function FacadeThumbnailSvg({ style }: { style: string }) {
               y1="82"
               x2={14 + i * 12}
               y2="18"
-              stroke="#60a5fa"
-              strokeWidth="1.2"
-              opacity="0.8"
+              stroke={ink}
+              strokeWidth="1.1"
+              opacity="0.7"
             />
           ))}
-          <path d="M 10,65 L 150,25" stroke="#93c5fd" strokeWidth="1" opacity="0.6" />
+          <path d="M 10,65 L 150,25" stroke={brass} strokeWidth="1" opacity="0.8" />
         </svg>
       );
     case 'steel':
       return (
         <svg viewBox="0 0 160 90" className="w-full h-full object-cover">
-          <rect width="160" height="90" fill="#0a0f16" />
+          <rect width="160" height="90" fill="#efece4" />
           {Array.from({ length: 8 }).map((_, i) => (
             <g key={i}>
-              <line x1={15 + i * 18} y1="85" x2={15 + i * 18} y2="20" stroke="#64748b" strokeWidth="3" />
-              <line x1={15 + i * 18} y1="85" x2={33 + i * 18} y2="20" stroke="#94a3b8" strokeWidth="1.5" />
+              <line x1={15 + i * 18} y1="85" x2={15 + i * 18} y2="20" stroke={ink} strokeWidth="3" />
+              <line x1={15 + i * 18} y1="85" x2={33 + i * 18} y2="20" stroke={muted} strokeWidth="1.5" />
             </g>
           ))}
         </svg>
@@ -210,7 +205,7 @@ function FacadeThumbnailSvg({ style }: { style: string }) {
     default:
       return (
         <svg viewBox="0 0 160 90" className="w-full h-full object-cover">
-          <rect width="160" height="90" fill="#140f09" />
+          <rect width="160" height="90" fill="#efece4" />
           {Array.from({ length: 8 }).map((_, i) => (
             <rect
               key={i}
@@ -218,9 +213,9 @@ function FacadeThumbnailSvg({ style }: { style: string }) {
               y="22"
               width="9"
               height="60"
-              fill="#f59e0b"
-              opacity="0.85"
-              rx="1"
+              fill={brass}
+              opacity="0.9"
+              rx="0.5"
             />
           ))}
         </svg>
@@ -233,10 +228,11 @@ function FacadePanel() {
   return (
     <div>
       <SectionHead
+        index="02 / 08"
         title="Exterior Facade"
-        subtitle="Step 2 of 8 · Select architectural cladding and skin structure"
+        subtitle="Architectural cladding and skin structure"
       />
-      <div className="px-4 space-y-3 pb-6">
+      <div className="px-5 space-y-3 pb-6">
         <div className="grid grid-cols-2 gap-2.5">
           {FACADE_STYLES.map((f) => {
             const isSelected = config.facade === f.value;
@@ -245,28 +241,24 @@ function FacadePanel() {
                 key={f.value}
                 onClick={() => updateConfig({ facade: f.value })}
                 className={cn(
-                  'group flex flex-col text-left rounded-lg border overflow-hidden transition-all relative',
+                  'group flex flex-col text-left border overflow-hidden transition-colors relative',
                   isSelected
-                    ? 'border-blue-500 bg-[#141b2a] ring-1 ring-blue-500/40 shadow-lg shadow-blue-500/10'
-                    : 'border-white/[0.08] bg-[#0f131d] hover:border-white/20 hover:bg-[#131824]'
+                    ? 'border-ink bg-paper-raised'
+                    : 'border-line bg-paper hover:border-line-strong'
                 )}
               >
-                {/* Visual Thumbnail */}
-                <div className="relative aspect-[16/10] w-full overflow-hidden border-b border-white/[0.06] bg-[#070a12]">
+                <div className="relative aspect-[16/10] w-full overflow-hidden border-b border-line">
                   <FacadeThumbnailSvg style={f.value} />
                   {isSelected && (
-                    <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-white shadow-md">
+                    <div className="absolute top-1.5 right-1.5 w-5 h-5 bg-brass flex items-center justify-center text-paper">
                       <Check size={11} strokeWidth={3} />
                     </div>
                   )}
                 </div>
 
-                {/* Text Content */}
                 <div className="p-2.5">
-                  <div className="text-[12px] font-semibold text-white leading-tight">
-                    {f.label}
-                  </div>
-                  <div className="text-[10px] text-slate-400 mt-1 line-clamp-2 leading-relaxed">
+                  <div className="text-[12px] font-semibold text-ink leading-tight">{f.label}</div>
+                  <div className="text-[10px] text-ink-muted mt-1 line-clamp-2 leading-relaxed">
                     {f.description}
                   </div>
                 </div>
@@ -283,19 +275,16 @@ function RoofPanel() {
   const { config, updateConfig } = useStadiumStore();
   return (
     <div>
-      <SectionHead
-        title="Roof Structure"
-        subtitle="Canopy and overhead structural system"
-      />
-      <div className="px-4 space-y-2">
+      <SectionHead index="03 / 08" title="Roof Structure" subtitle="Canopy and overhead structural system" />
+      <div className="px-5 space-y-2">
         {ROOF_TYPES.map((r) => (
           <OptionCard
             key={r.value}
             selected={config.roof === r.value}
             onClick={() => updateConfig({ roof: r.value })}
           >
-            <div className="text-xs font-medium text-white">{r.label}</div>
-            <div className="text-[11px] text-slate-400 mt-0.5">{r.description}</div>
+            <div className="text-xs font-medium text-ink">{r.label}</div>
+            <div className="text-[11px] text-ink-muted mt-0.5 leading-relaxed">{r.description}</div>
           </OptionCard>
         ))}
       </div>
@@ -307,16 +296,13 @@ function SeatingPanel() {
   const { config, updateSeating } = useStadiumStore();
   return (
     <div>
-      <SectionHead
-        title="Seating Configuration"
-        subtitle="Capacity, tier levels, and seating colors"
-      />
-      <div className="px-4 space-y-5">
+      <SectionHead index="04 / 08" title="Seating Configuration" subtitle="Capacity, tier levels and seat colors" />
+      <div className="px-5 space-y-6">
         <div>
           <div className="flex items-center justify-between mb-2">
-            <Label className="text-xs text-slate-400">Total capacity</Label>
-            <span className="text-xs font-mono font-semibold text-white">
-              {config.seating.capacity.toLocaleString()} seats
+            <Label className="text-xs text-ink-muted">Total capacity</Label>
+            <span className="text-xs font-mono font-semibold text-ink tabular-nums">
+              {config.seating.capacity.toLocaleString()}
             </span>
           </div>
           <Slider
@@ -327,7 +313,7 @@ function SeatingPanel() {
             onValueChange={([v]) => updateSeating({ capacity: v })}
             className="w-full my-1.5"
           />
-          <div className="flex justify-between text-[10px] text-slate-500 font-mono">
+          <div className="flex justify-between text-[10px] text-ink-muted/70 font-mono">
             <span>30K</span>
             <span>120K</span>
           </div>
@@ -335,9 +321,9 @@ function SeatingPanel() {
 
         <div>
           <div className="flex items-center justify-between mb-2">
-            <Label className="text-xs text-slate-400">Grandstand tiers</Label>
-            <span className="text-xs font-mono font-semibold text-white">
-              {config.seating.tiers} {config.seating.tiers === 1 ? 'tier' : 'tiers'}
+            <Label className="text-xs text-ink-muted">Grandstand tiers</Label>
+            <span className="text-xs font-mono font-semibold text-ink tabular-nums">
+              {config.seating.tiers}
             </span>
           </div>
           <Slider
@@ -348,36 +334,34 @@ function SeatingPanel() {
             onValueChange={([v]) => updateSeating({ tiers: v })}
             className="w-full my-1.5"
           />
-          <div className="flex justify-between text-[10px] text-slate-500 font-mono">
+          <div className="flex justify-between text-[10px] text-ink-muted/70 font-mono">
             <span>1</span>
             <span>4</span>
           </div>
         </div>
 
         <div>
-          <Label className="text-xs text-slate-400 mb-2 block">
-            Seat color
-          </Label>
+          <Label className="text-xs text-ink-muted mb-2 block">Seat color</Label>
           <div className="flex items-center gap-2.5">
             <input
               type="color"
               value={config.seating.primaryColor}
               onChange={(e) => updateSeating({ primaryColor: e.target.value })}
-              className="w-9 h-8 rounded border border-white/20 bg-transparent cursor-pointer shrink-0"
+              className="w-9 h-8 border border-line-strong bg-transparent cursor-pointer shrink-0 p-0.5"
             />
-            <span className="text-xs font-mono text-slate-300">
+            <span className="text-xs font-mono text-ink-soft uppercase">
               {config.seating.primaryColor}
             </span>
           </div>
         </div>
 
-        <div className="space-y-3 pt-2 border-t border-white/[0.06]">
+        <div className="space-y-3 pt-4 border-t border-line">
           {[
             { label: 'VIP hospitality seating', key: 'hasVip' as const },
             { label: 'Premium club seating', key: 'hasPremium' as const },
           ].map(({ label, key }) => (
             <div key={key} className="flex items-center justify-between">
-              <Label className="text-xs text-slate-300">{label}</Label>
+              <Label className="text-xs text-ink-soft">{label}</Label>
               <Switch
                 checked={config.seating[key]}
                 onCheckedChange={(v) => updateSeating({ [key]: v })}
@@ -396,23 +380,20 @@ function InteriorPanel() {
 
   return (
     <div>
-      <SectionHead
-        title="Interior & Lighting"
-        subtitle="Pitch design and floodlight system"
-      />
-      <div className="px-4 space-y-4">
+      <SectionHead index="05 / 08" title="Interior & Lighting" subtitle="Pitch design and floodlight system" />
+      <div className="px-5 space-y-5">
         <div>
-          <Label className="text-xs text-slate-400 mb-2 block">Floodlight mode</Label>
+          <Label className="text-xs text-ink-muted mb-2 block">Floodlight mode</Label>
           <div className="grid grid-cols-2 gap-1.5">
             {lightingOptions.map((opt) => (
               <button
                 key={opt}
                 onClick={() => updateInterior({ lighting: opt })}
                 className={cn(
-                  'py-2 px-2.5 rounded text-xs capitalize transition-colors text-left border',
+                  'py-2 px-2.5 text-xs capitalize transition-colors text-left border',
                   config.interior.lighting === opt
-                    ? 'bg-[#182030] border-blue-500/50 text-white font-medium'
-                    : 'bg-[#10141e] border-white/[0.06] text-slate-400 hover:text-white'
+                    ? 'border-ink bg-paper-raised text-ink font-medium'
+                    : 'border-line bg-paper text-ink-muted hover:border-line-strong hover:text-ink'
                 )}
               >
                 {opt}
@@ -421,14 +402,14 @@ function InteriorPanel() {
           </div>
         </div>
 
-        <div className="space-y-3 pt-2 border-t border-white/[0.06]">
+        <div className="space-y-3 pt-4 border-t border-line">
           {[
             { label: 'Scoreboard screens', key: 'hasScoreboard' as const },
             { label: 'Player tunnel', key: 'hasPlayerTunnel' as const },
             { label: 'Hospitality lounges', key: 'hasHospitality' as const },
           ].map(({ label, key }) => (
             <div key={key} className="flex items-center justify-between">
-              <Label className="text-xs text-slate-300">{label}</Label>
+              <Label className="text-xs text-ink-soft">{label}</Label>
               <Switch
                 checked={config.interior[key]}
                 onCheckedChange={(v) => updateInterior({ [key]: v })}
@@ -457,15 +438,16 @@ function EntryPanel() {
   return (
     <div>
       <SectionHead
+        index="06 / 08"
         title="Entry, Plaza & Landscape"
-        subtitle="Sky atmosphere, surrounding landscape, water features & entries"
+        subtitle="Sky atmosphere, surroundings, water features and entries"
       />
-      <div className="px-4 space-y-5 pb-6">
-        {/* ── 1. Sky & Background Atmosphere ── */}
+      <div className="px-5 space-y-5 pb-6">
+        {/* 1 — Sky */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <Label className="text-xs font-semibold text-white">Atmospheric Sky & Background</Label>
-            <span className="text-[10px] font-mono text-blue-400 capitalize">
+            <Label className="text-xs font-semibold text-ink">Atmospheric sky</Label>
+            <span className="annotation-brass normal-case tracking-normal">
               {currentLandscape.background}
             </span>
           </div>
@@ -477,25 +459,26 @@ function EntryPanel() {
                   key={preset.value}
                   onClick={() => updateLandscape({ background: preset.value })}
                   className={cn(
-                    'w-full text-left p-2.5 rounded-lg border transition-all flex items-center justify-between group',
+                    'w-full text-left p-2.5 border transition-colors flex items-center justify-between group',
                     isSelected
-                      ? 'bg-[#182030] border-blue-500/50 text-white shadow-sm'
-                      : 'bg-[#10141e] border-white/[0.06] text-slate-400 hover:bg-[#151a28] hover:text-white'
+                      ? 'border-ink bg-paper-raised text-ink'
+                      : 'border-line bg-paper text-ink-muted hover:border-line-strong hover:text-ink'
                   )}
                 >
                   <div className="flex items-center gap-2.5">
-                    <span className="text-base">{preset.icon}</span>
+                    <div
+                      className="w-6 h-6 border border-line-strong shrink-0"
+                      style={{ background: `linear-gradient(${preset.skyColor}, ${preset.horizonColor})` }}
+                    />
                     <div>
-                      <div className="text-xs font-medium text-white leading-tight">
-                        {preset.label}
-                      </div>
-                      <div className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">
+                      <div className="text-xs font-medium text-ink leading-tight">{preset.label}</div>
+                      <div className="text-[10px] text-ink-muted line-clamp-1 mt-0.5">
                         {preset.description}
                       </div>
                     </div>
                   </div>
                   {isSelected && (
-                    <div className="text-blue-400 shrink-0 ml-2">
+                    <div className="text-brass shrink-0 ml-2">
                       <Check size={14} />
                     </div>
                   )}
@@ -505,11 +488,11 @@ function EntryPanel() {
           </div>
         </div>
 
-        {/* ── 2. Surrounding Landscape Style ── */}
-        <div className="pt-3 border-t border-white/[0.08]">
+        {/* 2 — Landscape style */}
+        <div className="pt-4 border-t border-line">
           <div className="flex items-center justify-between mb-2">
-            <Label className="text-xs font-semibold text-white">Surrounding Landscape Style</Label>
-            <span className="text-[10px] font-mono text-indigo-400 capitalize">
+            <Label className="text-xs font-semibold text-ink">Landscape style</Label>
+            <span className="annotation-brass normal-case tracking-normal">
               {currentLandscape.landscapeStyle}
             </span>
           </div>
@@ -521,25 +504,26 @@ function EntryPanel() {
                   key={land.value}
                   onClick={() => updateLandscape({ landscapeStyle: land.value })}
                   className={cn(
-                    'w-full text-left p-2.5 rounded-lg border transition-all flex items-center justify-between group',
+                    'w-full text-left p-2.5 border transition-colors flex items-center justify-between',
                     isSelected
-                      ? 'bg-[#182030] border-indigo-500/50 text-white shadow-sm'
-                      : 'bg-[#10141e] border-white/[0.06] text-slate-400 hover:bg-[#151a28] hover:text-white'
+                      ? 'border-ink bg-paper-raised text-ink'
+                      : 'border-line bg-paper text-ink-muted hover:border-line-strong hover:text-ink'
                   )}
                 >
                   <div className="flex items-center gap-2.5">
-                    <span className="text-base">{land.icon}</span>
+                    <div
+                      className="w-6 h-6 border border-line-strong shrink-0"
+                      style={{ backgroundColor: land.accent }}
+                    />
                     <div>
-                      <div className="text-xs font-medium text-white leading-tight">
-                        {land.label}
-                      </div>
-                      <div className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">
+                      <div className="text-xs font-medium text-ink leading-tight">{land.label}</div>
+                      <div className="text-[10px] text-ink-muted line-clamp-1 mt-0.5">
                         {land.description}
                       </div>
                     </div>
                   </div>
                   {isSelected && (
-                    <div className="text-indigo-400 shrink-0 ml-2">
+                    <div className="text-brass shrink-0 ml-2">
                       <Check size={14} />
                     </div>
                   )}
@@ -549,59 +533,33 @@ function EntryPanel() {
           </div>
         </div>
 
-        {/* ── 3. Landscape Elements Toggles ── */}
-        <div className="pt-3 border-t border-white/[0.08] space-y-3">
-          <Label className="text-xs font-semibold text-white block">Landscape Features</Label>
+        {/* 3 — Feature toggles */}
+        <div className="pt-4 border-t border-line space-y-3">
+          <Label className="text-xs font-semibold text-ink block">Landscape features</Label>
 
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-xs text-slate-300">Landscaping Trees</div>
-              <div className="text-[10px] text-slate-500">Pines, cypresses, or date palms</div>
+          {[
+            { title: 'Landscaping trees', desc: 'Pines, cypresses or date palms', key: 'hasTrees' as const },
+            { title: 'Water features', desc: 'Lagoon moat or urban fountains', key: 'hasWaterFeatures' as const },
+            { title: 'Pedestrian avenues', desc: '4 grand approach boulevards', key: 'hasPedestrianAvenues' as const },
+            { title: 'Plaza ground lighting', desc: 'Perimeter bollard lights', key: 'hasPlazaLighting' as const },
+          ].map(({ title, desc, key }) => (
+            <div key={key} className="flex items-center justify-between">
+              <div>
+                <div className="text-xs text-ink-soft">{title}</div>
+                <div className="text-[10px] text-ink-muted">{desc}</div>
+              </div>
+              <Switch
+                checked={currentLandscape[key]}
+                onCheckedChange={(v) => updateLandscape({ [key]: v })}
+              />
             </div>
-            <Switch
-              checked={currentLandscape.hasTrees}
-              onCheckedChange={(v) => updateLandscape({ hasTrees: v })}
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-xs text-slate-300">Water Features</div>
-              <div className="text-[10px] text-slate-500">Lagoon moat or urban fountains</div>
-            </div>
-            <Switch
-              checked={currentLandscape.hasWaterFeatures}
-              onCheckedChange={(v) => updateLandscape({ hasWaterFeatures: v })}
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-xs text-slate-300">Pedestrian Avenues</div>
-              <div className="text-[10px] text-slate-500">4 grand approach boulevards</div>
-            </div>
-            <Switch
-              checked={currentLandscape.hasPedestrianAvenues}
-              onCheckedChange={(v) => updateLandscape({ hasPedestrianAvenues: v })}
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-xs text-slate-300">Plaza Ground Lighting</div>
-              <div className="text-[10px] text-slate-500">Perimeter glowing bollards</div>
-            </div>
-            <Switch
-              checked={currentLandscape.hasPlazaLighting}
-              onCheckedChange={(v) => updateLandscape({ hasPlazaLighting: v })}
-            />
-          </div>
+          ))}
         </div>
 
-        {/* ── 4. Main Entrance Architecture ── */}
-        <div className="pt-3 border-t border-white/[0.08]">
-          <Label className="text-xs font-semibold text-white mb-2 block">
-            Stadium Entrance Architecture
+        {/* 4 — Entrance architecture */}
+        <div className="pt-4 border-t border-line">
+          <Label className="text-xs font-semibold text-ink mb-2 block">
+            Stadium entrance architecture
           </Label>
           <div className="grid grid-cols-2 gap-1.5">
             {entranceOptions.map((opt) => (
@@ -609,10 +567,10 @@ function EntryPanel() {
                 key={opt}
                 onClick={() => updateEntry({ mainEntrance: opt })}
                 className={cn(
-                  'py-2 px-2.5 rounded text-xs capitalize transition-colors text-left border',
+                  'py-2 px-2.5 text-xs capitalize transition-colors text-left border',
                   config.entry.mainEntrance === opt
-                    ? 'bg-[#182030] border-blue-500/50 text-white font-medium'
-                    : 'bg-[#10141e] border-white/[0.06] text-slate-400 hover:text-white'
+                    ? 'border-ink bg-paper-raised text-ink font-medium'
+                    : 'border-line bg-paper text-ink-muted hover:border-line-strong hover:text-ink'
                 )}
               >
                 {opt}
@@ -620,16 +578,16 @@ function EntryPanel() {
             ))}
           </div>
 
-          <div className="space-y-3 pt-3 mt-3 border-t border-white/[0.06]">
+          <div className="space-y-3 pt-4 mt-4 border-t border-line">
             <div className="flex items-center justify-between">
-              <Label className="text-xs text-slate-300">VIP Gate Entrance</Label>
+              <Label className="text-xs text-ink-soft">VIP gate entrance</Label>
               <Switch
                 checked={config.entry.hasVipEntrance}
                 onCheckedChange={(v) => updateEntry({ hasVipEntrance: v })}
               />
             </div>
             <div className="flex items-center justify-between">
-              <Label className="text-xs text-slate-300">Subterranean Parking</Label>
+              <Label className="text-xs text-ink-soft">Subterranean parking</Label>
               <Switch
                 checked={config.entry.hasParking}
                 onCheckedChange={(v) => updateEntry({ hasParking: v })}
@@ -649,41 +607,38 @@ function MaterialsPanel() {
 
   return (
     <div>
-      <SectionHead
-        title="Materials & Colors"
-        subtitle="Structural surfaces and palette"
-      />
-      <div className="px-4 space-y-4">
+      <SectionHead index="07 / 08" title="Materials & Colors" subtitle="Structural surfaces and palette" />
+      <div className="px-5 space-y-5">
         <div className="grid grid-cols-3 gap-2">
           {[
             { label: 'Primary', val: config.materials.primaryColor, key: 'primaryColor' as const },
             { label: 'Structure', val: config.materials.secondaryColor, key: 'secondaryColor' as const },
             { label: 'Accent', val: config.materials.accentColor, key: 'accentColor' as const },
           ].map(({ label, val, key }) => (
-            <div key={key} className="p-2 rounded bg-[#10141e] border border-white/[0.06] text-center">
-              <span className="text-[10px] text-slate-400 block mb-1">{label}</span>
+            <div key={key} className="p-2 border border-line bg-paper text-center">
+              <span className="annotation block mb-1.5">{label}</span>
               <input
                 type="color"
                 value={val}
                 onChange={(e) => updateMaterials({ [key]: e.target.value })}
-                className="w-full h-7 rounded border border-white/20 bg-transparent cursor-pointer"
+                className="w-full h-7 border border-line-strong bg-transparent cursor-pointer p-0.5"
               />
             </div>
           ))}
         </div>
 
         <div>
-          <Label className="text-xs text-slate-400 mb-2 block">Surface finish</Label>
+          <Label className="text-xs text-ink-muted mb-2 block">Surface finish</Label>
           <div className="grid grid-cols-2 gap-1.5">
             {finishOptions.map((f) => (
               <button
                 key={f}
                 onClick={() => updateMaterials({ finish: f })}
                 className={cn(
-                  'py-1.5 px-2 rounded text-xs capitalize transition-colors border',
+                  'py-1.5 px-2 text-xs capitalize transition-colors border',
                   config.materials.finish === f
-                    ? 'bg-[#182030] border-blue-500/50 text-white font-medium'
-                    : 'bg-[#10141e] border-white/[0.06] text-slate-400 hover:text-white'
+                    ? 'border-ink bg-paper-raised text-ink font-medium'
+                    : 'border-line bg-paper text-ink-muted hover:border-line-strong hover:text-ink'
                 )}
               >
                 {f}
@@ -693,17 +648,17 @@ function MaterialsPanel() {
         </div>
 
         <div>
-          <Label className="text-xs text-slate-400 mb-2 block">Material substrate</Label>
+          <Label className="text-xs text-ink-muted mb-2 block">Material substrate</Label>
           <div className="grid grid-cols-2 gap-1.5">
             {materialOptions.map((m) => (
               <button
                 key={m}
                 onClick={() => updateMaterials({ material: m })}
                 className={cn(
-                  'py-1.5 px-2 rounded text-xs capitalize transition-colors border',
+                  'py-1.5 px-2 text-xs capitalize transition-colors border',
                   config.materials.material === m
-                    ? 'bg-[#182030] border-blue-500/50 text-white font-medium'
-                    : 'bg-[#10141e] border-white/[0.06] text-slate-400 hover:text-white'
+                    ? 'border-ink bg-paper-raised text-ink font-medium'
+                    : 'border-line bg-paper text-ink-muted hover:border-line-strong hover:text-ink'
                 )}
               >
                 {m}
@@ -720,29 +675,26 @@ function AddonsPanel() {
   const { config, updateAddons } = useStadiumStore();
   const addons: Array<{ label: string; key: keyof typeof config.addons; desc: string }> = [
     { label: 'Solar panel roof grid', key: 'hasSolarPanels', desc: 'Roof-mounted photovoltaic arrays' },
-    { label: 'LED video screens', key: 'hasLedScreens', desc: 'Perimeter stadium display boards' },
-    { label: 'Retractable roof motors', key: 'hasRetractableRoofMechanism', desc: 'Automated roof open/close actuators' },
-    { label: 'Smart lighting system', key: 'hasSmartLighting', desc: 'Automated matchday floodlight control' },
-    { label: 'Sustainability features', key: 'hasSustainabilityFeatures', desc: 'Rainwater harvesting and low-carbon design' },
+    { label: 'LED video screens', key: 'hasLedScreens', desc: 'Perimeter display boards' },
+    { label: 'Retractable roof motors', key: 'hasRetractableRoofMechanism', desc: 'Automated roof actuators' },
+    { label: 'Smart lighting system', key: 'hasSmartLighting', desc: 'Matchday floodlight control' },
+    { label: 'Sustainability features', key: 'hasSustainabilityFeatures', desc: 'Rainwater harvesting, low-carbon design' },
     { label: 'Concourse food courts', key: 'hasFoodCourts', desc: 'Dining facilities' },
     { label: 'Public fan plaza', key: 'hasFanZone', desc: 'Outdoor spectator zone' },
   ];
 
   return (
     <div>
-      <SectionHead
-        title="Add-ons & Systems"
-        subtitle="Sustainable and digital stadium components"
-      />
-      <div className="px-4 space-y-2">
+      <SectionHead index="08 / 08" title="Add-ons & Systems" subtitle="Sustainable and digital stadium components" />
+      <div className="px-5 space-y-2">
         {addons.map(({ label, key, desc }) => (
           <div
             key={key}
-            className="flex items-start justify-between gap-3 p-2.5 rounded bg-[#10141e] border border-white/[0.06]"
+            className="flex items-start justify-between gap-3 p-2.5 border border-line bg-paper"
           >
             <div>
-              <div className="text-xs font-medium text-slate-200">{label}</div>
-              <div className="text-[11px] text-slate-500 mt-0.5">{desc}</div>
+              <div className="text-xs font-medium text-ink-soft">{label}</div>
+              <div className="text-[11px] text-ink-muted mt-0.5">{desc}</div>
             </div>
             <Switch
               checked={config.addons[key]}
