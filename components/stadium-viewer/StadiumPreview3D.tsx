@@ -2,22 +2,358 @@
 
 import { Suspense, useRef, useMemo, useEffect, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, Stars } from '@react-three/drei';
+import { OrbitControls, Stars, Grid, Sky, Environment, Lightformer } from '@react-three/drei';
 import * as THREE from 'three';
-import type { StadiumConfig, EnvironmentBackground, LandscapeStyle, LandscapeConfig } from '@/types/stadium';
+import type { StadiumConfig, EnvironmentBackground, LandscapeConfig } from '@/types/stadium';
 import { DEFAULT_STADIUM_CONFIG, BACKGROUND_PRESETS, LANDSCAPE_STYLES } from '@/constants/stadium';
 import { useStadiumStore } from '@/stores/stadiumStore';
-import { Landmark, Camera, Building2, RotateCw, Maximize2 } from 'lucide-react';
+import {
+  RotateCcw,
+  Box,
+  Grid3x3,
+  Info,
+  Camera as CameraIcon,
+  Building2,
+  Eye,
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+// =============================================================================
+// CAMERA VIEW PRESETS
+// =============================================================================
+export type ViewerView =
+  | 'perspective'
+  | 'aerial'
+  | 'top'
+  | 'front'
+  | 'back'
+  | 'left'
+  | 'right'
+  | 'pitch'
+  | 'entry';
+
+const CAMERA_VIEWS: Record<ViewerView, { pos: [number, number, number]; target: [number, number, number] }> = {
+  perspective: { pos: [132, 82, 132], target: [0, 4, 0] },
+  aerial: { pos: [158, 138, 158], target: [0, 0, 0] },
+  top: { pos: [0, 205, 0.01], target: [0, 0, 0] },
+  front: { pos: [0, 26, 198], target: [0, 12, 0] },
+  back: { pos: [0, 26, -198], target: [0, 12, 0] },
+  left: { pos: [-198, 26, 0], target: [0, 12, 0] },
+  right: { pos: [198, 26, 0], target: [0, 12, 0] },
+  pitch: { pos: [0, 6, 26], target: [0, 2, -20] },
+  entry: { pos: [0, 12, 155], target: [0, 10, 66] },
+};
+
+// =============================================================================
+// 0. SKY, ATMOSPHERE & STUDIO ENVIRONMENT
+// =============================================================================
+function GradientSkyDome({ top, horizon }: { top: string; horizon: string }) {
+  const material = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        uniforms: {
+          topColor: { value: new THREE.Color(top) },
+          horizonColor: { value: new THREE.Color(horizon) },
+        },
+        vertexShader: `
+          varying vec3 vPos;
+          void main() {
+            vPos = position;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          uniform vec3 topColor;
+          uniform vec3 horizonColor;
+          varying vec3 vPos;
+          void main() {
+            float h = normalize(vPos).y;
+            float m = pow(max(h, 0.0), 0.62);
+            gl_FragColor = vec4(mix(horizonColor, topColor, m), 1.0);
+          }
+        `,
+        side: THREE.BackSide,
+        depthWrite: false,
+        fog: false,
+      }),
+    [top, horizon]
+  );
+
+  return (
+    <mesh material={material} renderOrder={-10}>
+      <sphereGeometry args={[460, 32, 20]} />
+    </mesh>
+  );
+}
+
+function AtmosphereFog({ color, near, far }: { color: string; near: number; far: number }) {
+  const scene = useThree((s) => s.scene);
+  useEffect(() => {
+    scene.fog = new THREE.Fog(color, near, far);
+    return () => {
+      scene.fog = null;
+    };
+  }, [scene, color, near, far]);
+  return null;
+}
+
+/** Procedural image-based-lighting for premium reflections (no external assets). */
+function StudioEnvironment({ warm }: { warm: boolean }) {
+  const scene = useThree((s) => s.scene);
+  useEffect(() => {
+    scene.environmentIntensity = 0.5;
+  }, [scene]);
+  return (
+    <Environment resolution={128} frames={1}>
+      <Lightformer intensity={warm ? 2.2 : 1.6} color={warm ? '#ffe4c0' : '#dce8f5'} position={[0, 60, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[120, 120, 1]} />
+      <Lightformer intensity={0.8} color={warm ? '#ff9d5c' : '#9db8d8'} position={[-40, 18, 30]} scale={[60, 30, 1]} />
+      <Lightformer intensity={0.8} color={warm ? '#ffc98a' : '#b8cee8'} position={[40, 18, -30]} scale={[60, 30, 1]} />
+      <Lightformer intensity={0.35} color="#7d8ba0" position={[0, -20, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={[120, 120, 1]} />
+    </Environment>
+  );
+}
+
+function DynamicEnvironmentSky({
+  background = 'night',
+  mini = false,
+}: {
+  background?: EnvironmentBackground;
+  mini?: boolean;
+}) {
+  const isNight = background === 'night';
+  const isSunset = background === 'sunset';
+  const isDay = background === 'day';
+  const isCyber = background === 'cyberpunk';
+  const isDesert = background === 'desert';
+
+  const preset = BACKGROUND_PRESETS.find((p) => p.value === background) ?? BACKGROUND_PRESETS[0];
+  const warm = isSunset || isDesert;
+
+  return (
+    <group>
+      {/* Sky backdrop: physically-inspired Sky for bright presets, gradient dome for night */}
+      {(isDay || isSunset || isDesert) && (
+        <Sky
+          distance={4500}
+          sunPosition={isDay ? [90, 70, 55] : isSunset ? [-190, 8, 120] : [170, 14, -110]}
+          turbidity={isDay ? 5 : isSunset ? 9 : 11}
+          rayleigh={isDay ? 1.1 : isSunset ? 3 : 2.4}
+          mieCoefficient={0.006}
+          mieDirectionalG={0.82}
+        />
+      )}
+      {(isNight || isCyber) && (
+        <GradientSkyDome top={preset.skyColor} horizon={preset.horizonColor} />
+      )}
+
+      <AtmosphereFog
+        color={preset.horizonColor}
+        near={isDay ? 260 : 190}
+        far={isDay ? 620 : 470}
+      />
+
+      {/* Image-based lighting for reflections (skipped in mini mode) */}
+      {!mini && <StudioEnvironment warm={warm} />}
+
+      {/* Key light with tuned soft shadows */}
+      <directionalLight
+        position={isDay ? [70, 130, 60] : isSunset ? [-150, 30, 110] : [70, 105, 80]}
+        intensity={isDay ? 2.6 : isSunset ? 2.4 : isCyber ? 1.4 : 1.6}
+        color={isDay ? '#fdf6e8' : isSunset ? '#ffb066' : isCyber ? '#7fb4ff' : isDesert ? '#ffce8f' : '#dfe8f5'}
+        castShadow={!mini}
+        shadow-mapSize={[2048, 2048]}
+        shadow-camera-left={-140}
+        shadow-camera-right={140}
+        shadow-camera-top={140}
+        shadow-camera-bottom={-140}
+        shadow-camera-near={10}
+        shadow-camera-far={450}
+        shadow-bias={-0.00035}
+      />
+
+      {/* Sky bounce fill */}
+      <hemisphereLight
+        args={[preset.skyColor, '#1a1812', isDay ? 0.85 : isSunset ? 0.5 : 0.35]}
+      />
+
+      {/* Cool counter-light for depth separation */}
+      <directionalLight
+        position={[-80, 70, -70]}
+        intensity={isCyber ? 1.3 : 0.55}
+        color={isCyber ? '#d946ef' : isSunset ? '#c084fc' : '#8fb3d9'}
+      />
+
+      {(isSunset || isDesert) && !mini && (
+        <pointLight
+          position={[isSunset ? -180 : 170, 22, isSunset ? 120 : -110]}
+          intensity={300}
+          distance={300}
+          color={isSunset ? '#ff9d4d' : '#e8a04d'}
+        />
+      )}
+
+      {/* Pitch floodlighting — a ring of lights under the roof opening (no shadows,
+          so the pitch glows at night the way a lit stadium reads from outside) */}
+      {!mini &&
+        Array.from({ length: 4 }).map((_, i) => {
+          const rad = (i * Math.PI * 2) / 4 + Math.PI / 4;
+          return (
+            <pointLight
+              key={i}
+              position={[Math.sin(rad) * 16, 23, Math.cos(rad) * 16]}
+              intensity={isDay ? 0 : isCyber ? 1300 : 1400}
+              distance={85}
+              color={isCyber ? '#06b6d4' : '#fff3d6'}
+            />
+          );
+        })}
+
+      {!isDay && !mini && (
+        <Stars
+          radius={300}
+          depth={50}
+          count={isNight ? 3800 : isCyber ? 2600 : isDesert ? 2200 : 1400}
+          factor={isCyber ? 5 : 3.6}
+          fade
+          speed={0.25}
+        />
+      )}
+    </group>
+  );
+}
+
+// =============================================================================
+// VIEWER UTILITIES: WIREFRAME OVERRIDE, GRID HELPER, CAMERA RIG
+// =============================================================================
+function WireframeOverride({ active }: { active: boolean }) {
+  const scene = useThree((s) => s.scene);
+  useEffect(() => {
+    scene.traverse((obj) => {
+      const mesh = obj as THREE.Mesh;
+      if (mesh.isMesh && mesh.material) {
+        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        mats.forEach((m) => {
+          const mat = m as THREE.MeshStandardMaterial;
+          if ('wireframe' in mat) mat.wireframe = active;
+        });
+      }
+    });
+  }, [active, scene]);
+  return null;
+}
+
+function SceneGrid({ visible }: { visible: boolean }) {
+  if (!visible) return null;
+  return (
+    <Grid
+      position={[0, 0.06, 0]}
+      args={[440, 440]}
+      cellSize={4}
+      cellThickness={0.5}
+      cellColor="#3a4150"
+      sectionSize={20}
+      sectionThickness={1}
+      sectionColor="#5a6578"
+      fadeDistance={480}
+      fadeStrength={1.4}
+      infiniteGrid
+    />
+  );
+}
+
+function CameraRig({ view }: { view: ViewerView }) {
+  const camera = useThree((s) => s.camera);
+  const controls = useThree((s) => s.controls) as unknown as {
+    target: THREE.Vector3;
+    update: () => void;
+  } | null;
+
+  const goal = useMemo(() => {
+    const v = CAMERA_VIEWS[view];
+    return { pos: new THREE.Vector3(...v.pos), target: new THREE.Vector3(...v.target) };
+  }, [view]);
+
+  const animating = useRef(true);
+  useEffect(() => {
+    animating.current = true;
+  }, [goal]);
+
+  useFrame(() => {
+    if (!animating.current || !controls) return;
+    camera.position.lerp(goal.pos, 0.085);
+    controls.target.lerp(goal.target, 0.085);
+    controls.update();
+    if (camera.position.distanceTo(goal.pos) < 0.6) animating.current = false;
+  });
+
+  return null;
+}
 
 // =============================================================================
 // 1. DYNAMIC PROCEDURAL LANDSCAPE & SURROUNDING GROUND
 // =============================================================================
-function DynamicLandscapeGround({ landscape }: { landscape?: LandscapeConfig }) {
+function DynamicLandscapeGround({ landscape, background = 'night' }: { landscape?: LandscapeConfig; background?: EnvironmentBackground }) {
   const style = landscape?.landscapeStyle ?? 'olympic';
   const hasTrees = landscape?.hasTrees ?? true;
   const hasWater = landscape?.hasWaterFeatures ?? true;
   const hasLighting = landscape?.hasPlazaLighting ?? true;
   const hasAvenues = landscape?.hasPedestrianAvenues ?? true;
+
+  // Preset-aware surface palette: night presets stay dark, bright presets read as daylight paving
+  const bright = background === 'day' || background === 'desert';
+  const dusk = background === 'sunset';
+  const cyber = background === 'cyberpunk';
+  const G = bright
+    ? {
+        base: style === 'desert' ? '#d3b98c' : style === 'park' ? '#85a364' : '#c8c1ab',
+        plaza: ['#c1baa4', '#aca590', '#9e9782', '#8e8773'],
+        avenue: '#a9a28c',
+        lawn: '#647f45',
+        parkRing: '#79a058',
+        parkPath: '#b3ab95',
+        waterOuter: '#aca48e',
+        urban: '#b4ac96',
+        fountain: '#8f887a',
+        podium: '#c5bda7',
+      }
+    : dusk
+      ? {
+          base: style === 'desert' ? '#6b502c' : style === 'park' ? '#1d2f1e' : '#2b2620',
+          plaza: ['#2a2320', '#332a24', '#2e2622', '#261f1c'],
+          avenue: '#3d332a',
+          lawn: '#243620',
+          parkRing: '#28422a',
+          parkPath: '#453b30',
+          waterOuter: '#2e2823',
+          urban: '#332c26',
+          fountain: '#211c18',
+          podium: '#2c251f',
+        }
+      : cyber
+        ? {
+            base: style === 'desert' ? '#4a3a22' : style === 'park' ? '#14211c' : '#0d0a18',
+            plaza: ['#14102a', '#1a1438', '#120e26', '#0e0a1e'],
+            avenue: '#1c1540',
+            lawn: '#16302a',
+            parkRing: '#1a2c3a',
+            parkPath: '#241b4a',
+            waterOuter: '#181236',
+            urban: '#1a1436',
+            fountain: '#120e28',
+            podium: '#12101f',
+          }
+        : {
+            base: style === 'desert' ? '#5c421f' : style === 'park' ? '#16281a' : '#0b0d13',
+            plaza: ['#131720', '#1a2029', '#151a24', '#10141c'],
+            avenue: '#20283a',
+            lawn: '#1c2e1f',
+            parkRing: '#1e3a26',
+            parkPath: '#39404a',
+            waterOuter: '#20242c',
+            urban: '#20242e',
+            fountain: '#171b24',
+            podium: '#17191d',
+          };
 
   const treeData = useMemo(() => {
     if (!hasTrees) return [];
@@ -38,28 +374,39 @@ function DynamicLandscapeGround({ landscape }: { landscape?: LandscapeConfig }) 
     return list;
   }, [hasTrees, style]);
 
-  const foliageMeshRef = useRef<THREE.InstancedMesh>(null);
   const trunkMeshRef = useRef<THREE.InstancedMesh>(null);
+  const canopyLowRef = useRef<THREE.InstancedMesh>(null);
+  const canopyHighRef = useRef<THREE.InstancedMesh>(null);
 
   useEffect(() => {
-    if (!foliageMeshRef.current || !trunkMeshRef.current || treeData.length === 0) return;
+    if (!trunkMeshRef.current || !canopyLowRef.current || !canopyHighRef.current || treeData.length === 0) return;
     const dummy = new THREE.Object3D();
 
     treeData.forEach((t, i) => {
-      dummy.position.set(t.pos[0], t.pos[1] + (t.type === 'palm' ? 2.2 : 1.2) * t.scale, t.pos[2]);
-      dummy.scale.set(t.scale, t.scale * (t.type === 'palm' ? 1.8 : 1.0), t.scale);
-      dummy.rotation.set(t.type === 'palm' ? 0.08 : 0, 0, 0);
+      const isPalm = t.type === 'palm';
+      // Trunk
+      dummy.position.set(t.pos[0], t.pos[1] + (isPalm ? 2.4 : 1.4) * t.scale, t.pos[2]);
+      dummy.scale.set(t.scale, t.scale * (isPalm ? 1.9 : 1.05), t.scale);
+      dummy.rotation.set(isPalm ? 0.07 : 0, i * 0.7, 0);
       dummy.updateMatrix();
       trunkMeshRef.current?.setMatrixAt(i, dummy.matrix);
 
-      dummy.position.set(t.pos[0], t.pos[1] + (t.type === 'palm' ? 4.2 : 3.0) * t.scale, t.pos[2]);
-      dummy.scale.set(t.scale * (t.type === 'palm' ? 1.6 : 1.0), t.scale * (t.type === 'palm' ? 0.6 : 1.4), t.scale * (t.type === 'palm' ? 1.6 : 1.0));
+      // Lower canopy
+      dummy.position.set(t.pos[0], t.pos[1] + (isPalm ? 4.4 : 2.6) * t.scale, t.pos[2]);
+      dummy.scale.set(t.scale * (isPalm ? 1.7 : 1.15), t.scale * (isPalm ? 0.7 : 0.85), t.scale * (isPalm ? 1.7 : 1.15));
       dummy.updateMatrix();
-      foliageMeshRef.current?.setMatrixAt(i, dummy.matrix);
+      canopyLowRef.current?.setMatrixAt(i, dummy.matrix);
+
+      // Upper canopy
+      dummy.position.set(t.pos[0], t.pos[1] + (isPalm ? 5.6 : 3.9) * t.scale, t.pos[2]);
+      dummy.scale.set(t.scale * (isPalm ? 1.35 : 0.8), t.scale * (isPalm ? 0.8 : 1.0), t.scale * (isPalm ? 1.35 : 0.8));
+      dummy.updateMatrix();
+      canopyHighRef.current?.setMatrixAt(i, dummy.matrix);
     });
 
     trunkMeshRef.current.instanceMatrix.needsUpdate = true;
-    foliageMeshRef.current.instanceMatrix.needsUpdate = true;
+    canopyLowRef.current.instanceMatrix.needsUpdate = true;
+    canopyHighRef.current.instanceMatrix.needsUpdate = true;
   }, [treeData]);
 
   const waterMeshRef = useRef<THREE.Mesh>(null);
@@ -74,11 +421,11 @@ function DynamicLandscapeGround({ landscape }: { landscape?: LandscapeConfig }) 
     <group position={[0, -0.05, 0]}>
       {/* Base Ground Plate */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.25, 0]} receiveShadow>
-        <planeGeometry args={[440, 440]} />
+        <planeGeometry args={[460, 460]} />
         <meshStandardMaterial
-          color={style === 'desert' ? '#78350f' : style === 'park' ? '#0f381e' : '#050811'}
+          color={G.base}
           roughness={0.95}
-          metalness={0.08}
+          metalness={0.05}
         />
       </mesh>
 
@@ -86,14 +433,14 @@ function DynamicLandscapeGround({ landscape }: { landscape?: LandscapeConfig }) 
       {style === 'olympic' && (
         <group>
           {[
-            { inner: 60, outer: 76, color: '#0d131f' },
-            { inner: 76, outer: 98, color: '#131b2c' },
-            { inner: 98, outer: 126, color: '#0f1728' },
-            { inner: 126, outer: 160, color: '#0a0f1d' },
+            { inner: 60, outer: 76, color: '#131720' },
+            { inner: 76, outer: 98, color: '#1a2029' },
+            { inner: 98, outer: 126, color: '#151a24' },
+            { inner: 126, outer: 160, color: '#10141c' },
           ].map((ring, idx) => (
             <mesh key={idx} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.15 + idx * 0.02, 0]} receiveShadow>
               <ringGeometry args={[ring.inner, ring.outer, 80]} />
-              <meshStandardMaterial color={ring.color} roughness={0.85} metalness={0.2} side={THREE.DoubleSide} />
+              <meshStandardMaterial color={ring.color} roughness={0.88} metalness={0.12} side={THREE.DoubleSide} />
             </mesh>
           ))}
 
@@ -102,12 +449,12 @@ function DynamicLandscapeGround({ landscape }: { landscape?: LandscapeConfig }) 
               <group key={i} rotation={[0, rot, 0]}>
                 <mesh position={[0, -0.08, 108]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
                   <planeGeometry args={[18, 75]} />
-                  <meshStandardMaterial color="#1a233a" roughness={0.7} metalness={0.3} />
+                  <meshStandardMaterial color="#20283a" roughness={0.72} metalness={0.2} />
                 </mesh>
                 {[-8.5, 8.5].map((lx, j) => (
                   <mesh key={j} position={[lx, -0.06, 108]} rotation={[-Math.PI / 2, 0, 0]}>
                     <planeGeometry args={[0.35, 75]} />
-                    <meshBasicMaterial color="#38bdf8" transparent opacity={0.7} />
+                    <meshBasicMaterial color="#c9a25e" transparent opacity={0.75} />
                   </mesh>
                 ))}
               </group>
@@ -121,7 +468,7 @@ function DynamicLandscapeGround({ landscape }: { landscape?: LandscapeConfig }) 
           ].map((s, i) => (
             <mesh key={i} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.07, 0]} receiveShadow>
               <ringGeometry args={[84, 118, 24, 1, s.start, s.end - s.start]} />
-              <meshStandardMaterial color="#0d3320" roughness={0.9} metalness={0.05} />
+              <meshStandardMaterial color="#1c2e1f" roughness={0.92} metalness={0.04} />
             </mesh>
           ))}
         </group>
@@ -132,14 +479,14 @@ function DynamicLandscapeGround({ landscape }: { landscape?: LandscapeConfig }) 
         <group>
           <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.15, 0]} receiveShadow>
             <ringGeometry args={[68, 175, 80]} />
-            <meshStandardMaterial color="#14532d" roughness={0.85} metalness={0.05} side={THREE.DoubleSide} />
+            <meshStandardMaterial color="#1e3a26" roughness={0.9} metalness={0.03} side={THREE.DoubleSide} />
           </mesh>
           {Array.from({ length: 8 }).map((_, i) => {
             const rot = (i * Math.PI * 2) / 8;
             return (
               <mesh key={i} position={[0, -0.1, 0]} rotation={[-Math.PI / 2, 0, rot]}>
                 <ringGeometry args={[75 + i * 10, 80 + i * 10, 64, 1, 0, Math.PI * 0.45]} />
-                <meshStandardMaterial color="#334155" roughness={0.75} side={THREE.DoubleSide} />
+                <meshStandardMaterial color="#39404a" roughness={0.8} side={THREE.DoubleSide} />
               </mesh>
             );
           })}
@@ -153,11 +500,11 @@ function DynamicLandscapeGround({ landscape }: { landscape?: LandscapeConfig }) 
             <mesh ref={waterMeshRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.08, 0]} receiveShadow>
               <ringGeometry args={[70, 155, 80]} />
               <meshStandardMaterial
-                color="#0284c7"
-                roughness={0.08}
-                metalness={0.85}
+                color="#0d4a63"
+                roughness={0.06}
+                metalness={0.9}
                 transparent
-                opacity={0.85}
+                opacity={0.88}
                 side={THREE.DoubleSide}
               />
             </mesh>
@@ -166,19 +513,19 @@ function DynamicLandscapeGround({ landscape }: { landscape?: LandscapeConfig }) 
             <group key={i} rotation={[0, rot, 0]}>
               <mesh position={[0, 0.15, 112]} receiveShadow>
                 <boxGeometry args={[14, 0.6, 85]} />
-                <meshStandardMaterial color="#78350f" roughness={0.65} metalness={0.2} />
+                <meshStandardMaterial color="#4a3520" roughness={0.7} metalness={0.15} />
               </mesh>
               {[-6.8, 6.8].map((rx, j) => (
                 <mesh key={j} position={[rx, 0.7, 112]}>
                   <boxGeometry args={[0.3, 0.7, 85]} />
-                  <meshStandardMaterial color="#38bdf8" emissive="#0284c7" emissiveIntensity={0.6} />
+                  <meshStandardMaterial color="#c9a25e" emissive="#8a6a30" emissiveIntensity={0.5} />
                 </mesh>
               ))}
             </group>
           ))}
           <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.05, 0]} receiveShadow>
             <ringGeometry args={[155, 190, 80]} />
-            <meshStandardMaterial color="#1e293b" roughness={0.8} side={THREE.DoubleSide} />
+            <meshStandardMaterial color="#20242c" roughness={0.82} side={THREE.DoubleSide} />
           </mesh>
         </group>
       )}
@@ -188,7 +535,7 @@ function DynamicLandscapeGround({ landscape }: { landscape?: LandscapeConfig }) 
         <group>
           <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.12, 0]} receiveShadow>
             <ringGeometry args={[68, 160, 64]} />
-            <meshStandardMaterial color="#181e2b" roughness={0.7} metalness={0.3} side={THREE.DoubleSide} />
+            <meshStandardMaterial color="#20242e" roughness={0.72} metalness={0.22} side={THREE.DoubleSide} />
           </mesh>
           {hasWater &&
             Array.from({ length: 8 }).map((_, i) => {
@@ -197,15 +544,15 @@ function DynamicLandscapeGround({ landscape }: { landscape?: LandscapeConfig }) 
                 <group key={i} position={[Math.sin(rad) * 96, 0, Math.cos(rad) * 96]}>
                   <mesh position={[0, 0.2, 0]}>
                     <cylinderGeometry args={[5, 5.5, 0.6, 24]} />
-                    <meshStandardMaterial color="#0f172a" roughness={0.5} />
+                    <meshStandardMaterial color="#171b24" roughness={0.55} />
                   </mesh>
                   <mesh position={[0, 0.45, 0]} rotation={[-Math.PI / 2, 0, 0]}>
                     <circleGeometry args={[4.8, 24]} />
-                    <meshStandardMaterial color="#38bdf8" roughness={0.1} metalness={0.9} transparent opacity={0.8} />
+                    <meshStandardMaterial color="#9ec8dd" roughness={0.08} metalness={0.85} transparent opacity={0.85} />
                   </mesh>
                   <mesh position={[0, 2.5, 0]}>
                     <cylinderGeometry args={[0.3, 0.9, 4.5, 12]} />
-                    <meshBasicMaterial color="#bae6fd" transparent opacity={0.7} />
+                    <meshBasicMaterial color="#e8f1f8" transparent opacity={0.65} />
                   </mesh>
                 </group>
               );
@@ -218,12 +565,12 @@ function DynamicLandscapeGround({ landscape }: { landscape?: LandscapeConfig }) 
         <group>
           <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.08, 0]} receiveShadow>
             <ringGeometry args={[68, 92, 64]} />
-            <meshStandardMaterial color="#9a3412" roughness={0.8} metalness={0.15} side={THREE.DoubleSide} />
+            <meshStandardMaterial color="#7a5c33" roughness={0.85} metalness={0.08} side={THREE.DoubleSide} />
           </mesh>
           {[
-            { inner: 92, outer: 120, col: '#b45309' },
-            { inner: 120, outer: 155, col: '#d97706' },
-            { inner: 155, outer: 190, col: '#92400e' },
+            { inner: 92, outer: 120, col: '#8d6d3e' },
+            { inner: 120, outer: 155, col: '#a3824c' },
+            { inner: 155, outer: 190, col: '#6f5430' },
           ].map((dune, idx) => (
             <mesh key={idx} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.15 + idx * 0.04, 0]} receiveShadow>
               <ringGeometry args={[dune.inner, dune.outer, 64]} />
@@ -233,28 +580,39 @@ function DynamicLandscapeGround({ landscape }: { landscape?: LandscapeConfig }) 
         </group>
       )}
 
-      {/* Stadium Podium Rim */}
+      {/* Stadium Podium Rim — open-ended wall (no solid cap!) + flat ring for the walkable top */}
       <mesh position={[0, 0.4, 0]} receiveShadow>
-        <cylinderGeometry args={[68, 70, 0.9, 72]} />
-        <meshStandardMaterial color={style === 'desert' ? '#78350f' : '#111827'} roughness={0.6} metalness={0.4} />
+        <cylinderGeometry args={[68, 70, 0.9, 72, 1, true]} />
+        <meshStandardMaterial color="#17191d" roughness={0.6} metalness={0.35} side={THREE.DoubleSide} />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.85, 0]} receiveShadow>
+        <ringGeometry args={[68, 70, 72]} />
+        <meshStandardMaterial color="#17191d" roughness={0.6} metalness={0.35} side={THREE.DoubleSide} />
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.88, 0]}>
         <ringGeometry args={[67.2, 68.2, 72]} />
-        <meshBasicMaterial color={style === 'desert' ? '#f59e0b' : '#38bdf8'} side={THREE.DoubleSide} />
+        <meshBasicMaterial color={style === 'desert' ? '#c9a25e' : '#c9a25e'} side={THREE.DoubleSide} />
       </mesh>
 
-      {/* Instanced Trees */}
+      {/* Instanced Trees: trunk + two-layer canopy */}
       {hasTrees && treeData.length > 0 && (
         <group>
-          <instancedMesh ref={trunkMeshRef} args={[new THREE.CylinderGeometry(0.14, 0.22, 2.8, 6), undefined, treeData.length]} castShadow>
-            <meshStandardMaterial color={style === 'desert' ? '#78350f' : '#3d2817'} roughness={0.9} />
+          <instancedMesh ref={trunkMeshRef} args={[new THREE.CylinderGeometry(0.14, 0.24, 2.8, 6), undefined, treeData.length]} castShadow>
+            <meshStandardMaterial color={style === 'desert' ? '#4a3520' : '#33261a'} roughness={0.92} />
           </instancedMesh>
           <instancedMesh
-            ref={foliageMeshRef}
-            args={[style === 'desert' ? new THREE.SphereGeometry(2.0, 8, 8) : new THREE.ConeGeometry(1.5, 4.0, 7), undefined, treeData.length]}
+            ref={canopyLowRef}
+            args={[style === 'desert' ? new THREE.SphereGeometry(2.0, 8, 8) : new THREE.ConeGeometry(1.7, 3.6, 7), undefined, treeData.length]}
             castShadow
           >
-            <meshStandardMaterial color={style === 'desert' ? '#15803d' : '#14532d'} roughness={0.8} />
+            <meshStandardMaterial color={style === 'desert' ? '#2d5a33' : '#1e4428'} roughness={0.85} />
+          </instancedMesh>
+          <instancedMesh
+            ref={canopyHighRef}
+            args={[style === 'desert' ? new THREE.SphereGeometry(1.5, 8, 8) : new THREE.ConeGeometry(1.2, 3.0, 7), undefined, treeData.length]}
+            castShadow
+          >
+            <meshStandardMaterial color={style === 'desert' ? '#3a6b40' : '#285732'} roughness={0.85} />
           </instancedMesh>
         </group>
       )}
@@ -267,11 +625,11 @@ function DynamicLandscapeGround({ landscape }: { landscape?: LandscapeConfig }) 
             <group key={i} position={[Math.sin(rad) * 73, 0.4, Math.cos(rad) * 73]}>
               <mesh position={[0, 0.6, 0]}>
                 <cylinderGeometry args={[0.08, 0.08, 1.2, 8]} />
-                <meshStandardMaterial color="#475569" metalness={0.9} />
+                <meshStandardMaterial color="#3c4149" metalness={0.9} />
               </mesh>
               <mesh position={[0, 1.25, 0]}>
                 <sphereGeometry args={[0.18, 12, 12]} />
-                <meshBasicMaterial color={style === 'desert' ? '#f59e0b' : '#38bdf8'} />
+                <meshBasicMaterial color="#ffdf9e" />
               </mesh>
             </group>
           );
@@ -281,7 +639,7 @@ function DynamicLandscapeGround({ landscape }: { landscape?: LandscapeConfig }) 
 }
 
 // =============================================================================
-// 2. FOOTBALL PITCH & OLYMPIC ATHLETICS TRACK (Responsive to Stadium Type)
+// 2. FOOTBALL PITCH & OLYMPIC ATHLETICS TRACK
 // =============================================================================
 function MasterPitchAndTrack({
   type = 'football',
@@ -294,56 +652,59 @@ function MasterPitchAndTrack({
   hasPlayerTunnel?: boolean;
   hasScoreboard?: boolean;
 }) {
-  const lineMaterial = useMemo(() => new THREE.LineBasicMaterial({ color: '#ffffff', linewidth: 2 }), []);
+  const lineMaterial = useMemo(() => new THREE.LineBasicMaterial({ color: '#f5f7f5', linewidth: 2 }), []);
 
   const lines = useMemo(() => {
     const p = (coords: [number, number, number][]) => coords.map(([x, y, z]) => new THREE.Vector3(x, y, z));
     return [
-      p([[-34, 1.03, -52.5], [34, 1.03, -52.5], [34, 1.03, 52.5], [-34, 1.03, 52.5], [-34, 1.03, -52.5]]),
-      p([[-34, 1.03, 0], [34, 1.03, 0]]),
-      p([[-20.16, 1.03, -52.5], [-20.16, 1.03, -36], [20.16, 1.03, -36], [20.16, 1.03, -52.5]]),
-      p([[-20.16, 1.03, 52.5], [-20.16, 1.03, 36], [20.16, 1.03, 36], [20.16, 1.03, 52.5]]),
-      p([[-9.16, 1.03, -52.5], [-9.16, 1.03, -47], [9.16, 1.03, -47], [9.16, 1.03, -52.5]]),
-      p([[-9.16, 1.03, 52.5], [-9.16, 1.03, 47], [9.16, 1.03, 47], [9.16, 1.03, 52.5]]),
+      p([[-34, 1.09, -52.5], [34, 1.09, -52.5], [34, 1.09, 52.5], [-34, 1.09, 52.5], [-34, 1.09, -52.5]]),
+      p([[-34, 1.09, 0], [34, 1.09, 0]]),
+      p([[-20.16, 1.09, -52.5], [-20.16, 1.09, -36], [20.16, 1.09, -36], [20.16, 1.09, -52.5]]),
+      p([[-20.16, 1.09, 52.5], [-20.16, 1.09, 36], [20.16, 1.09, 36], [20.16, 1.09, 52.5]]),
+      p([[-9.16, 1.09, -52.5], [-9.16, 1.09, -47], [9.16, 1.09, -47], [9.16, 1.09, -52.5]]),
+      p([[-9.16, 1.09, 52.5], [-9.16, 1.09, 47], [9.16, 1.09, 47], [9.16, 1.09, 52.5]]),
     ];
   }, []);
 
-  const grassPrimary = pitchDesign === 'heated' ? '#16a34a' : pitchDesign === 'classic' ? '#15803d' : '#147a38';
-  const grassSecondary = pitchDesign === 'heated' ? '#15803d' : pitchDesign === 'classic' ? '#166534' : '#0f612d';
+  const grassPrimary = pitchDesign === 'heated' ? '#2d6b34' : pitchDesign === 'classic' ? '#276030' : '#2a6a35';
+  const grassSecondary = pitchDesign === 'heated' ? '#255c2c' : pitchDesign === 'classic' ? '#1e5228' : '#1f5a2b';
+
+  // Scale the pitch/track ensemble so it fits inside the bowl:
+  // pitch corners reach radius ≈ 62.6 while tier 1 starts at radius 44.
+  const fitScale = type === 'olympic' ? 0.62 : 0.73;
 
   return (
-    <group position={[0, 0, 0]}>
-      {/* ── Olympic 400m Athletics Running Track (Red with White Lane Markings) ── */}
+    <group scale={fitScale}>
+      {/* ── Olympic 400m Athletics Running Track (elliptical, around the pitch) ── */}
       {type === 'olympic' && (
         <group>
-          {/* Red Synthetic Polyurethane Track Base */}
-          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 1.0, 0]} receiveShadow>
-            <ringGeometry args={[36, 52, 64]} />
-            <meshStandardMaterial color="#b91c1c" roughness={0.85} metalness={0.1} side={THREE.DoubleSide} />
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 1.0, 0]} scale={[1, 1.42, 1]} receiveShadow>
+            <ringGeometry args={[41, 51, 72]} />
+            <meshStandardMaterial color="#8e3b2f" roughness={0.88} metalness={0.06} side={THREE.DoubleSide} />
           </mesh>
-          {/* 8 Olympic Track Lanes */}
-          {[38, 40, 42, 44, 46, 48, 50, 52].map((r, i) => (
-            <mesh key={i} rotation={[-Math.PI / 2, 0, 0]} position={[0, 1.02, 0]}>
-              <ringGeometry args={[r - 0.08, r + 0.08, 64]} />
-              <meshBasicMaterial color="#ffffff" transparent opacity={0.6} side={THREE.DoubleSide} />
-            </mesh>
-          ))}
-          {/* Olympic Cauldron Tower with Ceremonial Flame Light at North End */}
+          {Array.from({ length: 8 }).map((_, i) => {
+            const r = 42.2 + i * 1.22;
+            return (
+              <mesh key={i} rotation={[-Math.PI / 2, 0, 0]} position={[0, 1.05, 0]} scale={[1, 1.42, 1]}>
+                <ringGeometry args={[r - 0.08, r + 0.08, 72]} />
+                <meshBasicMaterial color="#f5f2e8" transparent opacity={0.55} side={THREE.DoubleSide} />
+              </mesh>
+            );
+          })}
+          {/* Olympic Cauldron Tower */}
           <group position={[0, 1.0, -56]}>
             <mesh position={[0, 12, 0]}>
               <cylinderGeometry args={[0.6, 1.6, 24, 8]} />
-              <meshStandardMaterial color="#f8fafc" metalness={0.8} roughness={0.2} />
+              <meshStandardMaterial color="#e8e5dd" metalness={0.8} roughness={0.25} />
             </mesh>
-            {/* Cauldron Bowl */}
             <mesh position={[0, 24.5, 0]}>
               <coneGeometry args={[3.2, 2.5, 16]} />
-              <meshStandardMaterial color="#fbbf24" metalness={0.9} roughness={0.1} />
+              <meshStandardMaterial color="#d9a24a" metalness={0.9} roughness={0.15} />
             </mesh>
-            {/* Burning Olympic Flame Light */}
-            <pointLight position={[0, 26, 0]} intensity={350} distance={120} color="#f97316" />
+            <pointLight position={[0, 26, 0]} intensity={350} distance={120} color="#ff8c3a" />
             <mesh position={[0, 26, 0]}>
               <sphereGeometry args={[1.2, 16, 16]} />
-              <meshBasicMaterial color="#f97316" />
+              <meshBasicMaterial color="#ff8c3a" />
             </mesh>
           </group>
         </group>
@@ -353,21 +714,21 @@ function MasterPitchAndTrack({
       {Array.from({ length: 11 }).map((_, i) => {
         const z = -50 + i * 10;
         return (
-          <mesh key={i} rotation={[-Math.PI / 2, 0, 0]} position={[0, 1.01, z]} receiveShadow>
+          <mesh key={i} rotation={[-Math.PI / 2, 0, 0]} position={[0, 1.06, z]} receiveShadow>
             <planeGeometry args={[68, 10]} />
             <meshStandardMaterial
               color={i % 2 === 1 ? grassPrimary : grassSecondary}
-              roughness={0.8}
-              metalness={0.05}
+              roughness={0.85}
+              metalness={0.03}
             />
           </mesh>
         );
       })}
 
       {/* Pitch Safety Run-off */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.99, 0]} receiveShadow>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.97, 0]} receiveShadow>
         <planeGeometry args={[84, 120]} />
-        <meshStandardMaterial color="#0a2a16" roughness={0.9} />
+        <meshStandardMaterial color="#12291a" roughness={0.92} />
       </mesh>
 
       {/* Field Lines */}
@@ -376,32 +737,31 @@ function MasterPitchAndTrack({
       ))}
 
       {/* Center Circle & Spot */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 1.03, 0]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 1.09, 0]}>
         <ringGeometry args={[9.0, 9.25, 64]} />
-        <meshBasicMaterial color="#ffffff" side={THREE.DoubleSide} />
+        <meshBasicMaterial color="#f5f7f5" side={THREE.DoubleSide} />
       </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 1.03, 0]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 1.09, 0]}>
         <circleGeometry args={[0.5, 32]} />
-        <meshBasicMaterial color="#ffffff" />
+        <meshBasicMaterial color="#f5f7f5" />
       </mesh>
 
-      {/* ── Professional Pitch Markings ── */}
-      {/* Penalty spots (11m from each goal line) */}
+      {/* Penalty spots */}
       {[-41.5, 41.5].map((z, i) => (
-        <mesh key={`pspot-${i}`} rotation={[-Math.PI / 2, 0, 0]} position={[0, 1.03, z]}>
+        <mesh key={`pspot-${i}`} rotation={[-Math.PI / 2, 0, 0]} position={[0, 1.09, z]}>
           <circleGeometry args={[0.35, 20]} />
-          <meshBasicMaterial color="#ffffff" />
+          <meshBasicMaterial color="#f5f7f5" />
         </mesh>
       ))}
 
-      {/* Penalty arcs (9.15m radius around each spot, only outside the box) */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 1.03, -41.5]}>
+      {/* Penalty arcs */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 1.09, -41.5]}>
         <ringGeometry args={[8.95, 9.2, 32, 1, Math.PI * 7 / 6, Math.PI * 2 / 3]} />
-        <meshBasicMaterial color="#ffffff" side={THREE.DoubleSide} />
+        <meshBasicMaterial color="#f5f7f5" side={THREE.DoubleSide} />
       </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 1.03, 41.5]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 1.09, 41.5]}>
         <ringGeometry args={[8.95, 9.2, 32, 1, Math.PI / 6, Math.PI * 2 / 3]} />
-        <meshBasicMaterial color="#ffffff" side={THREE.DoubleSide} />
+        <meshBasicMaterial color="#f5f7f5" side={THREE.DoubleSide} />
       </mesh>
 
       {/* Corner arcs */}
@@ -411,44 +771,41 @@ function MasterPitchAndTrack({
         { x: 34, z: 52.5, start: Math.PI * 0.5 },
         { x: -34, z: 52.5, start: 0 },
       ].map((c, i) => (
-        <mesh key={`carc-${i}`} rotation={[-Math.PI / 2, 0, 0]} position={[c.x, 1.03, c.z]}>
+        <mesh key={`carc-${i}`} rotation={[-Math.PI / 2, 0, 0]} position={[c.x, 1.09, c.z]}>
           <ringGeometry args={[0.8, 1.0, 16, 1, c.start, Math.PI / 2]} />
-          <meshBasicMaterial color="#ffffff" side={THREE.DoubleSide} />
+          <meshBasicMaterial color="#f5f7f5" side={THREE.DoubleSide} />
         </mesh>
       ))}
 
-      {/* ── 3D Goals with Real Nets ── */}
+      {/* ── 3D Goals with Nets ── */}
       {[[-52.5, 0], [52.5, Math.PI]].map(([gz, rot], i) => (
         <group key={`goal-${i}`} position={[0, 1.0, gz]} rotation={[0, rot, 0]}>
-          {/* White goal frame */}
           <mesh position={[0, 2.44, 0]} rotation={[0, 0, Math.PI / 2]}>
             <cylinderGeometry args={[0.09, 0.09, 7.32, 16]} />
-            <meshStandardMaterial color="#ffffff" roughness={0.2} metalness={0.8} />
+            <meshStandardMaterial color="#f2f2f2" roughness={0.2} metalness={0.8} />
           </mesh>
           {[-3.66, 3.66].map((gx, j) => (
             <mesh key={j} position={[gx, 1.22, 0]}>
               <cylinderGeometry args={[0.09, 0.09, 2.44, 16]} />
-              <meshStandardMaterial color="#ffffff" roughness={0.2} metalness={0.8} />
+              <meshStandardMaterial color="#f2f2f2" roughness={0.2} metalness={0.8} />
             </mesh>
           ))}
-          {/* Rear ground frame */}
           <mesh position={[0, 0.05, -1.9]} rotation={[0, 0, Math.PI / 2]}>
             <cylinderGeometry args={[0.05, 0.05, 7.32, 10]} />
-            <meshStandardMaterial color="#ffffff" roughness={0.3} metalness={0.7} />
+            <meshStandardMaterial color="#f2f2f2" roughness={0.3} metalness={0.7} />
           </mesh>
-          {/* Net: rear, roof and side panels */}
           <mesh position={[0, 1.22, -1.85]}>
             <planeGeometry args={[7.32, 2.44]} />
-            <meshBasicMaterial color="#ffffff" transparent opacity={0.22} side={THREE.DoubleSide} wireframe />
+            <meshBasicMaterial color="#ffffff" transparent opacity={0.2} side={THREE.DoubleSide} wireframe />
           </mesh>
           <mesh position={[0, 2.42, -0.95]} rotation={[Math.PI / 2.6, 0, 0]}>
             <planeGeometry args={[7.32, 2.2]} />
-            <meshBasicMaterial color="#ffffff" transparent opacity={0.16} side={THREE.DoubleSide} wireframe />
+            <meshBasicMaterial color="#ffffff" transparent opacity={0.14} side={THREE.DoubleSide} wireframe />
           </mesh>
           {[-3.66, 3.66].map((gx, j) => (
             <mesh key={`side-${j}`} position={[gx, 1.22, -0.95]} rotation={[0, Math.PI / 2, 0]}>
               <planeGeometry args={[1.9, 2.44]} />
-              <meshBasicMaterial color="#ffffff" transparent opacity={0.14} side={THREE.DoubleSide} wireframe />
+              <meshBasicMaterial color="#ffffff" transparent opacity={0.12} side={THREE.DoubleSide} wireframe />
             </mesh>
           ))}
         </group>
@@ -459,90 +816,79 @@ function MasterPitchAndTrack({
         <group key={`flag-${i}`} position={[cx, 1.0, cz]}>
           <mesh position={[0, 0.75, 0]}>
             <cylinderGeometry args={[0.04, 0.04, 1.5, 8]} />
-            <meshStandardMaterial color="#f8fafc" metalness={0.6} roughness={0.3} />
+            <meshStandardMaterial color="#e8e5dd" metalness={0.6} roughness={0.3} />
           </mesh>
           <mesh position={[0.22, 1.32, 0]} rotation={[0, i * Math.PI / 2, 0]}>
             <planeGeometry args={[0.44, 0.3]} />
-            <meshStandardMaterial color="#f59e0b" side={THREE.DoubleSide} roughness={0.7} />
+            <meshStandardMaterial color="#c9a25e" side={THREE.DoubleSide} roughness={0.7} />
           </mesh>
         </group>
       ))}
 
-      {/* ── Animated Perimeter LED Ribbon Boards ── */}
+      {/* ── Animated Perimeter LED Ribbon ── */}
       <AnimatedLedRibbon />
 
       {/* ── North Stand Scoreboard Tower ── */}
       {hasScoreboard && (
         <group position={[0, 1.0, -59]}>
-          {/* Steel support mast */}
           <mesh position={[0, 6, -1.5]}>
             <cylinderGeometry args={[0.35, 0.55, 12, 10]} />
-            <meshStandardMaterial color="#475569" metalness={0.9} roughness={0.25} />
+            <meshStandardMaterial color="#3c4149" metalness={0.9} roughness={0.3} />
           </mesh>
-          {/* Screen housing */}
           <mesh position={[0, 12.5, 0]}>
             <boxGeometry args={[16, 7, 1.2]} />
-            <meshStandardMaterial color="#020617" roughness={0.3} metalness={0.7} />
+            <meshStandardMaterial color="#0a0c10" roughness={0.3} metalness={0.7} />
           </mesh>
-          {/* Display face */}
           <mesh position={[0, 12.5, 0.65]}>
             <planeGeometry args={[15, 6.2]} />
-            <meshStandardMaterial color="#0f172a" emissive="#1d4ed8" emissiveIntensity={0.55} />
+            <meshStandardMaterial color="#0f1420" emissive="#8a1f1f" emissiveIntensity={0.5} />
           </mesh>
-          {/* Maintenance platform */}
           <mesh position={[0, 8.6, 0]}>
             <boxGeometry args={[17, 0.3, 2]} />
-            <meshStandardMaterial color="#334155" metalness={0.8} roughness={0.3} />
+            <meshStandardMaterial color="#2c3138" metalness={0.8} roughness={0.3} />
           </mesh>
         </group>
       )}
 
-      {/* ── Player Tunnel Mouth ── */}
+      {/* ── Player Tunnel ── */}
       {hasPlayerTunnel && (
         <group position={[0, 1.0, -56.5]}>
-          {/* Tunnel frame */}
           <mesh position={[0, 1.5, -1]}>
             <boxGeometry args={[6.5, 3, 3.6]} />
-            <meshStandardMaterial color="#1e293b" roughness={0.5} metalness={0.5} />
+            <meshStandardMaterial color="#22262d" roughness={0.5} metalness={0.5} />
           </mesh>
-          {/* Recessed opening */}
           <mesh position={[0, 1.35, 0.85]}>
             <boxGeometry args={[5, 2.7, 0.3]} />
-            <meshBasicMaterial color="#020617" />
+            <meshBasicMaterial color="#050608" />
           </mesh>
-          {/* Illuminated crown strip */}
           <mesh position={[0, 3.1, 0.85]}>
             <boxGeometry args={[5.4, 0.25, 0.4]} />
-            <meshStandardMaterial color="#f8fafc" emissive="#38bdf8" emissiveIntensity={0.7} />
+            <meshStandardMaterial color="#e8e5dd" emissive="#c9a25e" emissiveIntensity={0.7} />
           </mesh>
         </group>
       )}
 
-      {/* Dugouts */}
+      {/* ── Dugouts ── */}
       {[-12, 12].map((dx, i) => (
         <group key={i} position={[dx, 1.0, -56]}>
-          {/* Shell seats */}
           {[-4, -2, 0, 2, 4].map((sx, j) => (
             <mesh key={j} position={[sx, 0.55, 0.3]}>
               <boxGeometry args={[1.1, 0.5, 0.9]} />
-              <meshStandardMaterial color={i === 0 ? '#b91c1c' : '#1d4ed8'} roughness={0.4} />
+              <meshStandardMaterial color={i === 0 ? '#8e3b2f' : '#25405c'} roughness={0.45} />
             </mesh>
           ))}
-          {/* Cantilevered transparent canopy */}
           <mesh position={[0, 2.3, 0.4]}>
             <boxGeometry args={[11, 0.15, 2.8]} />
-            <meshStandardMaterial color="#bae6fd" transparent opacity={0.35} roughness={0.05} metalness={0.6} />
+            <meshStandardMaterial color="#cfe0ec" transparent opacity={0.32} roughness={0.05} metalness={0.6} />
           </mesh>
-          {/* Rear acrylic windbreak */}
           <mesh position={[0, 1.4, 1.7]}>
             <boxGeometry args={[11, 1.8, 0.12]} />
-            <meshStandardMaterial color="#bae6fd" transparent opacity={0.3} roughness={0.05} metalness={0.6} />
+            <meshStandardMaterial color="#cfe0ec" transparent opacity={0.28} roughness={0.05} metalness={0.6} />
           </mesh>
-          {/* Steel frame legs */}
           {[-5.2, 0, 5.2].map((fx, j) => (
             <mesh key={j} position={[fx, 1.2, 1.6]}>
               <cylinderGeometry args={[0.06, 0.06, 2.4, 8]} />
-              <meshStandardMaterial color="#475569" metalness={0.9} roughness={0.2} />
+              <meshStandardMaterial color="#3c4149" metalness={0.9} roughness={0.2} />
             </mesh>
           ))}
         </group>
@@ -552,7 +898,7 @@ function MasterPitchAndTrack({
 }
 
 // =============================================================================
-// 2b. ANIMATED PERIMETER LED RIBBON (Live color cycling)
+// 2b. ANIMATED PERIMETER LED RIBBON
 // =============================================================================
 function AnimatedLedRibbon() {
   const matsRef = useRef<(THREE.MeshStandardMaterial | null)[]>([]);
@@ -562,7 +908,7 @@ function AnimatedLedRibbon() {
     matsRef.current.forEach((m, i) => {
       if (m) {
         const phase = Math.sin(t * 0.8 + i * Math.PI / 2) * 0.5 + 0.5;
-        m.emissive.setHSL(0.58 - phase * 0.13, 0.85, 0.42 + phase * 0.1);
+        m.emissive.setHSL(0.1 - phase * 0.04, 0.7, 0.32 + phase * 0.1);
       }
     });
   });
@@ -574,10 +920,10 @@ function AnimatedLedRibbon() {
           <boxGeometry args={[0.5, 1.0, 110]} />
           <meshStandardMaterial
             ref={(m) => { matsRef.current[i] = m as THREE.MeshStandardMaterial | null; }}
-            color="#0c4a6e"
-            emissive="#0369a1"
+            color="#1a1408"
+            emissive="#8a6a30"
             emissiveIntensity={0.9}
-            roughness={0.3}
+            roughness={0.35}
           />
         </mesh>
       ))}
@@ -586,7 +932,7 @@ function AnimatedLedRibbon() {
 }
 
 // =============================================================================
-// 3. DETAILED GRANDSTAND BOWL & INSTANCED SEATS (Adapts to Stadium Type)
+// 3. GRANDSTAND BOWL & INSTANCED SEATS
 // =============================================================================
 function RealisticGrandstands({
   type = 'football',
@@ -604,8 +950,6 @@ function RealisticGrandstands({
   const actualTiers = Math.min(Math.max(tiers, 1), 4);
   const isOlympic = type === 'olympic';
   const isMulti = type === 'multi-purpose';
-
-  // Scale bowl outward for Olympic athletics track
   const rOffset = isOlympic ? 10 : 0;
 
   const tierConfigs = useMemo(() => {
@@ -634,7 +978,6 @@ function RealisticGrandstands({
           const deg = (angle * 180) / Math.PI;
           if (deg % 30 < 2.4) continue;
 
-          // Football is rectangular-oval; Multi-purpose is circular; Olympic is wide oval
           const scaleX = isMulti ? 1.0 : isOlympic ? 0.94 : 0.90;
           const scaleZ = isMulti ? 1.0 : isOlympic ? 1.18 : 1.15;
 
@@ -676,7 +1019,7 @@ function RealisticGrandstands({
           <group key={idx}>
             <mesh position={[0, midY, 0]} receiveShadow>
               <cylinderGeometry args={[t.outerR * 1.05, t.innerR * 0.98, h, 64, 1, true]} />
-              <meshStandardMaterial color="#1e293b" roughness={0.9} metalness={0.1} side={THREE.DoubleSide} />
+              <meshStandardMaterial color="#20242c" roughness={0.92} metalness={0.08} side={THREE.DoubleSide} />
             </mesh>
 
             {Array.from({ length: t.steps }).map((_, stepIdx) => {
@@ -686,14 +1029,14 @@ function RealisticGrandstands({
               return (
                 <mesh key={stepIdx} rotation={[-Math.PI / 2, 0, 0]} position={[0, y, 0]} receiveShadow>
                   <ringGeometry args={[r - 0.4, r + 0.8, 64]} />
-                  <meshStandardMaterial color="#0f172a" roughness={0.95} />
+                  <meshStandardMaterial color="#15181e" roughness={0.95} />
                 </mesh>
               );
             })}
 
             <mesh position={[0, t.yStart + 0.7, 0]}>
               <cylinderGeometry args={[t.innerR * 0.98, t.innerR * 0.98, 1.2, 64, 1, true]} />
-              <meshStandardMaterial color="#38bdf8" transparent opacity={0.3} roughness={0.1} metalness={0.9} side={THREE.DoubleSide} />
+              <meshStandardMaterial color="#c9a25e" transparent opacity={0.28} roughness={0.1} metalness={0.9} side={THREE.DoubleSide} />
             </mesh>
           </group>
         );
@@ -703,24 +1046,24 @@ function RealisticGrandstands({
         <group position={[0, 7.4, 0]}>
           <mesh>
             <cylinderGeometry args={[56 + rOffset, 54 + rOffset, 1.6, 64, 1, true]} />
-            <meshStandardMaterial color="#fbbf24" emissive="#d97706" emissiveIntensity={0.6} roughness={0.2} side={THREE.DoubleSide} />
+            <meshStandardMaterial color="#c9a25e" emissive="#7a5c28" emissiveIntensity={0.5} roughness={0.25} side={THREE.DoubleSide} />
           </mesh>
           <mesh position={[0, -0.9, 0]}>
             <cylinderGeometry args={[53.8 + rOffset, 53.8 + rOffset, 0.6, 64, 1, true]} />
-            <meshStandardMaterial color="#0ea5e9" emissive="#0284c7" emissiveIntensity={0.8} />
+            <meshStandardMaterial color="#8a6a30" emissive="#6a4e1e" emissiveIntensity={0.7} />
           </mesh>
         </group>
       )}
 
-      <instancedMesh ref={seatMeshRef} args={[seatGeometry, undefined, seatPositions.length]} castShadow receiveShadow>
-        <meshStandardMaterial color={seatColor} roughness={0.4} metalness={0.25} />
+      <instancedMesh ref={seatMeshRef} args={[seatGeometry, undefined, seatPositions.length]} receiveShadow>
+        <meshStandardMaterial color={seatColor} roughness={0.55} metalness={0.08} />
       </instancedMesh>
     </group>
   );
 }
 
 // =============================================================================
-// 4. VISIBLE 3D STADIUM ENTRANCES & VIP PORTALS (Entry & Plaza)
+// 4. STADIUM ENTRANCES & VIP PORTALS
 // =============================================================================
 function VisibleStadiumEntrances({ config }: { config: StadiumConfig }) {
   const entranceStyle = config.entry?.mainEntrance ?? 'glass';
@@ -729,20 +1072,18 @@ function VisibleStadiumEntrances({ config }: { config: StadiumConfig }) {
 
   return (
     <group>
-      {/* ── South Grand Entrance (Main Public Gate) ── */}
+      {/* ── South Grand Entrance ── */}
       <group position={[0, 0, 68]}>
-        {/* Grand Terraced Entrance Staircase leading up from plaza */}
         <group position={[0, 0.35, 6]}>
           {Array.from({ length: 6 }).map((_, step) => (
             <mesh key={step} position={[0, step * 0.22, -step * 1.4]} receiveShadow>
               <boxGeometry args={[32 - step * 1.5, 0.25, 2.2]} />
-              <meshStandardMaterial color="#1e293b" roughness={0.7} metalness={0.3} />
+              <meshStandardMaterial color="#22262d" roughness={0.72} metalness={0.25} />
             </mesh>
           ))}
-          {/* Central Accessible Ramp */}
           <mesh position={[0, 0.6, -3.5]} rotation={[0.15, 0, 0]}>
             <boxGeometry args={[6, 0.1, 9]} />
-            <meshStandardMaterial color="#0f172a" roughness={0.8} />
+            <meshStandardMaterial color="#15181e" roughness={0.85} />
           </mesh>
         </group>
 
@@ -751,17 +1092,15 @@ function VisibleStadiumEntrances({ config }: { config: StadiumConfig }) {
           <group position={[0, 1.4, 0]}>
             <mesh position={[0, 7, 0]} castShadow>
               <boxGeometry args={[28, 14, 8]} />
-              <meshStandardMaterial color="#38bdf8" transparent opacity={0.55} roughness={0.05} metalness={0.9} />
+              <meshStandardMaterial color="#9ec8dd" transparent opacity={0.5} roughness={0.05} metalness={0.9} />
             </mesh>
-            {/* Cantilever Glass Canopy over entrance */}
             <mesh position={[0, 8.5, 6]} rotation={[0.08, 0, 0]} castShadow>
               <boxGeometry args={[32, 0.6, 9]} />
-              <meshStandardMaterial color="#0284c7" metalness={0.9} roughness={0.1} />
+              <meshStandardMaterial color="#31363e" metalness={0.9} roughness={0.15} />
             </mesh>
-            {/* Illuminated Portal Turnstiles & Signage */}
             <mesh position={[0, 11, 3.5]}>
               <boxGeometry args={[20, 1.8, 0.4]} />
-              <meshStandardMaterial color="#0f172a" emissive="#38bdf8" emissiveIntensity={0.8} />
+              <meshStandardMaterial color="#15181e" emissive="#c9a25e" emissiveIntensity={0.8} />
             </mesh>
           </group>
         )}
@@ -769,21 +1108,18 @@ function VisibleStadiumEntrances({ config }: { config: StadiumConfig }) {
         {/* 2. MONUMENTAL ARCH GATEWAY */}
         {entranceStyle === 'arch' && (
           <group position={[0, 1.4, 0]}>
-            {/* Monumental Soaring Arch */}
             <mesh position={[0, 12, 0]} castShadow>
               <torusGeometry args={[13, 2.2, 16, 32, Math.PI]} />
-              <meshStandardMaterial color="#f8fafc" roughness={0.25} metalness={0.5} />
+              <meshStandardMaterial color="#e8e5dd" roughness={0.3} metalness={0.45} />
             </mesh>
-            {/* Glowing Inner Arch Contour Ribbon */}
             <mesh position={[0, 12, 0.2]}>
               <torusGeometry args={[11.8, 0.35, 16, 32, Math.PI]} />
-              <meshBasicMaterial color="#38bdf8" />
+              <meshBasicMaterial color="#c9a25e" />
             </mesh>
-            {/* Gate Portals */}
             {[-9, 9].map((px, i) => (
               <mesh key={i} position={[px, 6, 0]}>
                 <boxGeometry args={[3.5, 12, 4]} />
-                <meshStandardMaterial color="#1e293b" metalness={0.7} />
+                <meshStandardMaterial color="#22262d" metalness={0.7} />
               </mesh>
             ))}
           </group>
@@ -794,27 +1130,23 @@ function VisibleStadiumEntrances({ config }: { config: StadiumConfig }) {
           <group position={[0, 1.4, 0]}>
             {[-15, 15].map((tx, i) => (
               <group key={i} position={[tx, 0, 0]}>
-                {/* 40m Soaring Pylon */}
                 <mesh position={[0, 20, 0]} castShadow>
                   <cylinderGeometry args={[0.8, 2.2, 40, 8]} />
-                  <meshStandardMaterial color="#f1f5f9" metalness={0.85} roughness={0.2} />
+                  <meshStandardMaterial color="#e8e5dd" metalness={0.85} roughness={0.25} />
                 </mesh>
-                {/* Vertical Blue Laser Light Blade */}
                 <mesh position={[0, 20, 1.2]}>
                   <boxGeometry args={[0.3, 38, 0.2]} />
-                  <meshBasicMaterial color="#38bdf8" />
+                  <meshBasicMaterial color="#c9a25e" />
                 </mesh>
-                {/* Sky Tension Stay Cable */}
                 <mesh position={[-tx * 0.4, 18, 0]} rotation={[0, 0, (tx > 0 ? -1 : 1) * Math.PI / 6]}>
                   <cylinderGeometry args={[0.08, 0.08, 28, 8]} />
-                  <meshStandardMaterial color="#94a3b8" metalness={0.9} />
+                  <meshStandardMaterial color="#8a8f98" metalness={0.9} />
                 </mesh>
               </group>
             ))}
-            {/* Crossbeam Welcome Bridge */}
             <mesh position={[0, 12, 0]}>
               <boxGeometry args={[30, 2.4, 3.5]} />
-              <meshStandardMaterial color="#0f172a" emissive="#0284c7" emissiveIntensity={0.6} />
+              <meshStandardMaterial color="#15181e" emissive="#8a6a30" emissiveIntensity={0.6} />
             </mesh>
           </group>
         )}
@@ -822,17 +1154,15 @@ function VisibleStadiumEntrances({ config }: { config: StadiumConfig }) {
         {/* 4. CLASSICAL MONUMENTAL PORTICO */}
         {entranceStyle === 'classic' && (
           <group position={[0, 1.4, 0]}>
-            {/* 6 Monumental Stone Colonnade Pillars */}
             {[-12, -7.2, -2.4, 2.4, 7.2, 12].map((cx, i) => (
               <mesh key={i} position={[cx, 8, 2]} castShadow>
                 <cylinderGeometry args={[1.1, 1.3, 16, 16]} />
-                <meshStandardMaterial color="#f59e0b" roughness={0.8} />
+                <meshStandardMaterial color="#d9c6a0" roughness={0.8} />
               </mesh>
             ))}
-            {/* Classical Triangular Pediment Gable */}
             <mesh position={[0, 18, 2]}>
               <coneGeometry args={[16, 5, 3]} />
-              <meshStandardMaterial color="#d97706" roughness={0.85} />
+              <meshStandardMaterial color="#bfa678" roughness={0.85} />
             </mesh>
           </group>
         )}
@@ -841,43 +1171,37 @@ function VisibleStadiumEntrances({ config }: { config: StadiumConfig }) {
       {/* ── West VIP Arrival Porte-Cochère ── */}
       {hasVip && (
         <group position={[-68, 1.2, 0]} rotation={[0, Math.PI / 2, 0]}>
-          {/* Cantilever Drop-off Canopy */}
           <mesh position={[0, 4.5, 3]} castShadow>
             <boxGeometry args={[16, 0.6, 10]} />
-            <meshStandardMaterial color="#1e293b" metalness={0.9} roughness={0.2} />
+            <meshStandardMaterial color="#22262d" metalness={0.9} roughness={0.25} />
           </mesh>
-          {/* VIP Red Carpet Runway */}
           <mesh position={[0, 0.08, 8]} rotation={[-Math.PI / 2, 0, 0]}>
             <planeGeometry args={[4, 16]} />
-            <meshStandardMaterial color="#991b1b" roughness={0.8} />
+            <meshStandardMaterial color="#6e1f1f" roughness={0.85} />
           </mesh>
-          {/* Glass Skybridge Connecting to VIP Suites */}
           <mesh position={[0, 4.5, -4]}>
             <boxGeometry args={[6, 3.2, 8]} />
-            <meshStandardMaterial color="#38bdf8" transparent opacity={0.5} roughness={0.1} />
+            <meshStandardMaterial color="#9ec8dd" transparent opacity={0.45} roughness={0.1} />
           </mesh>
         </group>
       )}
 
-      {/* ── Subterranean Parking Portal Ramps ── */}
+      {/* ── Parking Portal Ramps ── */}
       {hasParking && (
         <group position={[68, 0, 24]} rotation={[0, -Math.PI / 2, 0]}>
-          {/* Downward Sloped Asphalt Ramp */}
           <mesh position={[0, -0.6, 6]} rotation={[0.2, 0, 0]}>
             <planeGeometry args={[10, 14]} />
-            <meshStandardMaterial color="#0f172a" roughness={0.9} />
+            <meshStandardMaterial color="#15181e" roughness={0.92} />
           </mesh>
-          {/* Concrete Retaining Walls */}
           {[-5.2, 5.2].map((wx, i) => (
             <mesh key={i} position={[wx, 0.4, 6]}>
               <boxGeometry args={[0.4, 2.2, 14]} />
-              <meshStandardMaterial color="#334155" roughness={0.8} />
+              <meshStandardMaterial color="#33383f" roughness={0.82} />
             </mesh>
           ))}
-          {/* Parking Portal Gate Header */}
           <mesh position={[0, 2.0, 1]}>
             <boxGeometry args={[11, 1.0, 1]} />
-            <meshStandardMaterial color="#1e293b" emissive="#10b981" emissiveIntensity={0.6} />
+            <meshStandardMaterial color="#15181e" emissive="#4a6748" emissiveIntensity={0.6} />
           </mesh>
         </group>
       )}
@@ -886,7 +1210,7 @@ function VisibleStadiumEntrances({ config }: { config: StadiumConfig }) {
 }
 
 // =============================================================================
-// 5. SIGNATURE ARCHITECTURAL FACADE
+// 5. SIGNATURE ARCHITECTURAL FACADE (reacts to material palette)
 // =============================================================================
 function ArchitecturalFacade({ config }: { config: StadiumConfig }) {
   const facade = config.facade;
@@ -895,6 +1219,7 @@ function ArchitecturalFacade({ config }: { config: StadiumConfig }) {
   const botR = 64;
   const height = isIndoor ? 32 : 26;
   const centerY = height / 2;
+  const { primaryColor, secondaryColor, accentColor } = config.materials;
 
   const diagridBeams = useMemo(() => {
     const beams: { pos: [number, number, number]; rot: [number, number, number]; len: number }[] = [];
@@ -933,15 +1258,15 @@ function ArchitecturalFacade({ config }: { config: StadiumConfig }) {
 
   return (
     <group>
-      {/* Inner Concourse Drum */}
+      {/* Inner Concourse Drum — tinted by structure color */}
       <mesh position={[0, centerY, 0]}>
         <cylinderGeometry args={[topR - 2.5, botR - 2.5, height - 1.5, 64, 1, true]} />
         <meshStandardMaterial
-          color="#0f172a"
-          emissive={facade === 'traditional' ? '#92400e' : '#b45309'}
-          emissiveIntensity={0.65}
-          roughness={0.4}
-          metalness={0.5}
+          color="#1c1913"
+          emissive={secondaryColor}
+          emissiveIntensity={0.18}
+          roughness={0.58}
+          metalness={0.22}
           side={THREE.DoubleSide}
         />
       </mesh>
@@ -949,7 +1274,7 @@ function ArchitecturalFacade({ config }: { config: StadiumConfig }) {
       {[centerY - 6, centerY + 2, centerY + 8].map((yLevel, idx) => (
         <mesh key={idx} rotation={[-Math.PI / 2, 0, 0]} position={[0, yLevel, 0]}>
           <ringGeometry args={[botR - 3, topR - 2, 64]} />
-          <meshBasicMaterial color="#f59e0b" transparent opacity={0.5} side={THREE.DoubleSide} />
+          <meshBasicMaterial color={accentColor} transparent opacity={0.45} side={THREE.DoubleSide} />
         </mesh>
       ))}
 
@@ -959,7 +1284,7 @@ function ArchitecturalFacade({ config }: { config: StadiumConfig }) {
           {diagridBeams.map((beam, i) => (
             <mesh key={i} position={beam.pos} rotation={beam.rot} castShadow>
               <boxGeometry args={[1.1, beam.len, 1.4]} />
-              <meshStandardMaterial color="#f8fafc" roughness={0.25} metalness={0.35} />
+              <meshStandardMaterial color="#e8e5dd" roughness={0.3} metalness={0.35} />
             </mesh>
           ))}
           {[1.2, centerY, centerY + 12].map((yPos, i) => {
@@ -967,7 +1292,7 @@ function ArchitecturalFacade({ config }: { config: StadiumConfig }) {
             return (
               <mesh key={i} position={[0, yPos, 0]} rotation={[-Math.PI / 2, 0, 0]}>
                 <ringGeometry args={[r - 0.7, r + 0.7, 72]} />
-                <meshStandardMaterial color="#f1f5f9" roughness={0.2} metalness={0.5} side={THREE.DoubleSide} />
+                <meshStandardMaterial color={primaryColor} roughness={0.25} metalness={0.5} side={THREE.DoubleSide} />
               </mesh>
             );
           })}
@@ -983,7 +1308,7 @@ function ArchitecturalFacade({ config }: { config: StadiumConfig }) {
               <group key={i} position={[Math.sin(rad) * (botR + 1.2), centerY, Math.cos(rad) * (botR + 1.2)]} rotation={[0, -rad, 0]}>
                 <mesh castShadow>
                   <boxGeometry args={[0.5, height, 2.6]} />
-                  <meshStandardMaterial color={i % 2 === 0 ? '#b45309' : '#d97706'} roughness={0.35} metalness={0.7} />
+                  <meshStandardMaterial color={i % 2 === 0 ? secondaryColor : accentColor} roughness={0.4} metalness={0.6} />
                 </mesh>
               </group>
             );
@@ -991,7 +1316,7 @@ function ArchitecturalFacade({ config }: { config: StadiumConfig }) {
         </group>
       )}
 
-      {/* 3. Geometric Origami */}
+      {/* 3. Geometric Origami — driven by the material palette */}
       {facade === 'geometric' && (
         <group>
           {Array.from({ length: 28 }).map((_, i) => {
@@ -1000,11 +1325,11 @@ function ArchitecturalFacade({ config }: { config: StadiumConfig }) {
               <group key={i} position={[Math.sin(rad) * (botR + 2.5), centerY, Math.cos(rad) * (botR + 2.5)]} rotation={[0, -rad, 0]}>
                 <mesh position={[0, 6, 0]} rotation={[0.2, 0, 0]} castShadow>
                   <coneGeometry args={[7, 13, 3]} />
-                  <meshStandardMaterial color="#c084fc" metalness={0.7} roughness={0.2} />
+                  <meshStandardMaterial color={secondaryColor} metalness={0.65} roughness={0.25} />
                 </mesh>
                 <mesh position={[0, -6, 0]} rotation={[-0.2, Math.PI, 0]} castShadow>
                   <coneGeometry args={[6.5, 13, 3]} />
-                  <meshStandardMaterial color="#9333ea" metalness={0.65} roughness={0.25} />
+                  <meshStandardMaterial color={primaryColor} metalness={0.6} roughness={0.3} />
                 </mesh>
               </group>
             );
@@ -1017,12 +1342,12 @@ function ArchitecturalFacade({ config }: { config: StadiumConfig }) {
         <group position={[0, centerY, 0]}>
           <mesh castShadow>
             <cylinderGeometry args={[topR, botR, height, 72, 8, true]} />
-            <meshStandardMaterial color="#e0f2fe" metalness={0.75} roughness={0.2} wireframe side={THREE.DoubleSide} />
+            <meshStandardMaterial color="#dfe4ea" metalness={0.75} roughness={0.22} wireframe side={THREE.DoubleSide} />
           </mesh>
           {[-8, -3, 2, 7, 12].map((yOff, i) => (
             <mesh key={i} position={[0, yOff, 0]} rotation={[-Math.PI / 2, 0, 0]}>
               <ringGeometry args={[botR + 1.5, botR + 2.4, 72]} />
-              <meshStandardMaterial color="#38bdf8" emissive="#0284c7" emissiveIntensity={0.6} side={THREE.DoubleSide} />
+              <meshStandardMaterial color={accentColor} emissive={accentColor} emissiveIntensity={0.55} side={THREE.DoubleSide} />
             </mesh>
           ))}
         </group>
@@ -1033,14 +1358,14 @@ function ArchitecturalFacade({ config }: { config: StadiumConfig }) {
         <group position={[0, centerY, 0]}>
           <mesh castShadow>
             <cylinderGeometry args={[topR, botR, height, 64, 4, true]} />
-            <meshStandardMaterial color="#38bdf8" transparent opacity={0.5} roughness={0.05} metalness={0.95} side={THREE.DoubleSide} />
+            <meshStandardMaterial color={accentColor} transparent opacity={0.45} roughness={0.05} metalness={0.95} side={THREE.DoubleSide} />
           </mesh>
           {Array.from({ length: 48 }).map((_, i) => {
             const rad = (i * Math.PI * 2) / 48;
             return (
               <mesh key={i} position={[Math.sin(rad) * (botR + 0.5), 0, Math.cos(rad) * (botR + 0.5)]} rotation={[0, -rad, 0]}>
                 <boxGeometry args={[0.3, height, 0.6]} />
-                <meshStandardMaterial color="#0284c7" metalness={0.9} roughness={0.1} />
+                <meshStandardMaterial color={secondaryColor} metalness={0.9} roughness={0.12} />
               </mesh>
             );
           })}
@@ -1052,14 +1377,14 @@ function ArchitecturalFacade({ config }: { config: StadiumConfig }) {
         <group position={[0, centerY, 0]}>
           <mesh castShadow>
             <cylinderGeometry args={[topR, botR, height, 48, 6, true]} />
-            <meshStandardMaterial color="#64748b" metalness={0.95} roughness={0.3} wireframe side={THREE.DoubleSide} />
+            <meshStandardMaterial color={secondaryColor} metalness={0.95} roughness={0.32} wireframe side={THREE.DoubleSide} />
           </mesh>
           {Array.from({ length: 24 }).map((_, i) => {
             const rad = (i * Math.PI * 2) / 24;
             return (
               <mesh key={i} position={[Math.sin(rad) * (botR + 1.5), 0, Math.cos(rad) * (botR + 1.5)]} castShadow>
                 <cylinderGeometry args={[0.6, 0.8, height, 12]} />
-                <meshStandardMaterial color="#334155" metalness={0.9} roughness={0.2} />
+                <meshStandardMaterial color={primaryColor} metalness={0.9} roughness={0.25} />
               </mesh>
             );
           })}
@@ -1074,27 +1399,27 @@ function ArchitecturalFacade({ config }: { config: StadiumConfig }) {
             return (
               <mesh key={i} position={[Math.sin(rad) * (botR + 1.8), 0, Math.cos(rad) * (botR + 1.8)]} rotation={[0, -rad, 0]} castShadow>
                 <cylinderGeometry args={[1.2, 1.4, height, 16]} />
-                <meshStandardMaterial color="#f59e0b" roughness={0.8} metalness={0.15} />
+                <meshStandardMaterial color="#d9c6a0" roughness={0.82} metalness={0.1} />
               </mesh>
             );
           })}
           <mesh position={[0, centerY - 1, 0]} rotation={[-Math.PI / 2, 0, 0]}>
             <ringGeometry args={[topR - 1.0, topR + 2.5, 64]} />
-            <meshStandardMaterial color="#d97706" roughness={0.85} side={THREE.DoubleSide} />
+            <meshStandardMaterial color="#bfa678" roughness={0.85} side={THREE.DoubleSide} />
           </mesh>
         </group>
       )}
 
       <mesh position={[0, centerY + height / 2 + 0.2, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[topR - 1.5, topR + 2.2, 72]} />
-        <meshStandardMaterial color="#0f172a" metalness={0.85} roughness={0.2} side={THREE.DoubleSide} />
+        <meshStandardMaterial color="#15181e" metalness={0.85} roughness={0.25} side={THREE.DoubleSide} />
       </mesh>
     </group>
   );
 }
 
 // =============================================================================
-// 6. MASTER ROOF & DOME ENCLOSURE (Dynamic Variations)
+// 6. MASTER ROOF & DOME ENCLOSURE
 // =============================================================================
 function MasterRoofCanopy({ config }: { config: StadiumConfig }) {
   const roof = config.roof;
@@ -1102,31 +1427,27 @@ function MasterRoofCanopy({ config }: { config: StadiumConfig }) {
   const secColor = config.materials.secondaryColor;
   const roofY = isIndoor ? 33 : 27;
 
-  // Bio-Dome enclosure for Indoor Stadium Type
   if (isIndoor) {
     return (
       <group position={[0, 16, 0]}>
-        {/* Full Geodesic Translucent Bio-Dome Shell */}
-        <mesh castShadow>
+        <mesh>
           <sphereGeometry args={[82, 64, 48, 0, Math.PI * 2, 0, Math.PI / 2.05]} />
           <meshStandardMaterial
-            color="#0ea5e9"
+            color="#9ec8dd"
             metalness={0.85}
-            roughness={0.1}
+            roughness={0.12}
             transparent
-            opacity={0.65}
+            opacity={0.6}
             side={THREE.DoubleSide}
           />
         </mesh>
-        {/* Bio-Structural Hexagonal Arches */}
         <mesh>
           <sphereGeometry args={[82.4, 32, 24, 0, Math.PI * 2, 0, Math.PI / 2.05]} />
-          <meshStandardMaterial color="#f8fafc" metalness={0.9} roughness={0.2} wireframe />
+          <meshStandardMaterial color="#e8e5dd" metalness={0.9} roughness={0.22} wireframe />
         </mesh>
-        {/* Glowing Apex Skylight Oculus */}
         <mesh position={[0, 81.8, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <circleGeometry args={[18, 32]} />
-          <meshBasicMaterial color="#38bdf8" />
+          <meshBasicMaterial color="#dcebf5" />
         </mesh>
       </group>
     );
@@ -1135,10 +1456,9 @@ function MasterRoofCanopy({ config }: { config: StadiumConfig }) {
   if (roof === 'open') {
     return (
       <group position={[0, roofY, 0]}>
-        {/* Floating Structural Steel Tension Ring */}
         <mesh rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[62, 78, 64]} />
-          <meshStandardMaterial color="#334155" metalness={0.9} roughness={0.2} side={THREE.DoubleSide} />
+          <meshStandardMaterial color="#2c3138" metalness={0.9} roughness={0.25} side={THREE.DoubleSide} />
         </mesh>
       </group>
     );
@@ -1146,18 +1466,18 @@ function MasterRoofCanopy({ config }: { config: StadiumConfig }) {
 
   return (
     <group position={[0, roofY, 0]}>
-      {/* Outer Sweeping Aerodynamic Canopy */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} castShadow receiveShadow>
+      {/* Outer Sweeping Canopy (translucent-ish: does not cast a full shadow) */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
         <ringGeometry args={[46, 78, 72]} />
-        <meshStandardMaterial color="#f8fafc" roughness={0.3} metalness={0.3} side={THREE.DoubleSide} />
+        <meshStandardMaterial color="#e8e5dd" roughness={0.35} metalness={0.28} side={THREE.DoubleSide} />
       </mesh>
 
       <mesh position={[0, 0.6, 0]}>
         <cylinderGeometry args={[78.2, 76.5, 1.2, 72, 1, true]} />
-        <meshStandardMaterial color="#e2e8f0" metalness={0.5} roughness={0.2} side={THREE.DoubleSide} />
+        <meshStandardMaterial color="#d5d2c8" metalness={0.5} roughness={0.25} side={THREE.DoubleSide} />
       </mesh>
 
-      {/* Radial Cantilever Trusses */}
+      {/* Radial Cantilever Trusses — structure color */}
       {Array.from({ length: 24 }).map((_, i) => {
         const rad = (i * Math.PI * 2) / 24;
         return (
@@ -1168,53 +1488,52 @@ function MasterRoofCanopy({ config }: { config: StadiumConfig }) {
             castShadow
           >
             <boxGeometry args={[30, 0.8, 0.8]} />
-            <meshStandardMaterial color={secColor || '#475569'} metalness={0.85} roughness={0.2} />
+            <meshStandardMaterial color={secColor} metalness={0.85} roughness={0.25} />
           </mesh>
         );
       })}
 
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.1, 0]}>
         <ringGeometry args={[44.8, 46.2, 72]} />
-        <meshBasicMaterial color="#38bdf8" side={THREE.DoubleSide} />
+        <meshBasicMaterial color="#c9a25e" side={THREE.DoubleSide} />
       </mesh>
 
-      {/* Retractable Sliding Petal Panels & Guide Rails */}
+      {/* Retractable Sliding Petal Panels */}
       {roof === 'retractable' && (
         <group>
-          {/* Motorized Guide Rails spanning across opening */}
           {[-20, 0, 20].map((gx, i) => (
             <mesh key={i} position={[gx, 2.2, 0]}>
               <boxGeometry args={[0.8, 1.2, 88]} />
-              <meshStandardMaterial color="#475569" metalness={0.9} roughness={0.2} />
+              <meshStandardMaterial color={secColor} metalness={0.85} roughness={0.25} />
             </mesh>
           ))}
-          {/* Half-Closed Sliding Petal Panels */}
           <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 1.2, 0]}>
             <ringGeometry args={[20, 46, 64]} />
             <meshStandardMaterial
-              color="#0284c7"
+              color={secColor}
               transparent
-              opacity={0.7}
-              roughness={0.2}
-              metalness={0.8}
+              opacity={0.28}
+              roughness={0.15}
+              metalness={0.6}
               side={THREE.DoubleSide}
+              depthWrite={false}
             />
           </mesh>
           <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 1.4, 0]}>
             <ringGeometry args={[19.4, 20.4, 64]} />
-            <meshBasicMaterial color="#38bdf8" side={THREE.DoubleSide} />
+            <meshBasicMaterial color="#c9a25e" side={THREE.DoubleSide} />
           </mesh>
         </group>
       )}
 
-      {/* Translucent ETFE Pneumatic Cushions */}
+      {/* Translucent ETFE Cushions */}
       {roof === 'transparent' && (
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.5, 0]}>
           <ringGeometry args={[26, 46, 64]} />
           <meshStandardMaterial
-            color="#7dd3fc"
+            color="#cfe4f2"
             transparent
-            opacity={0.35}
+            opacity={0.32}
             roughness={0.08}
             metalness={0.9}
             side={THREE.DoubleSide}
@@ -1222,40 +1541,40 @@ function MasterRoofCanopy({ config }: { config: StadiumConfig }) {
         </mesh>
       )}
 
-      {/* Geodesic Glass & Steel Arching Dome */}
+      {/* Geodesic Dome */}
       {roof === 'dome' && (
         <group>
-          <mesh position={[0, 4, 0]} castShadow>
+          <mesh position={[0, 4, 0]}>
             <sphereGeometry args={[78, 64, 32, 0, Math.PI * 2, 0, Math.PI / 2.8]} />
             <meshStandardMaterial
-              color="#0ea5e9"
+              color="#9ec8dd"
               metalness={0.85}
-              roughness={0.15}
+              roughness={0.16}
               transparent
-              opacity={0.7}
+              opacity={0.65}
               side={THREE.DoubleSide}
             />
           </mesh>
           <mesh position={[0, 4.2, 0]}>
             <sphereGeometry args={[78.2, 28, 16, 0, Math.PI * 2, 0, Math.PI / 2.8]} />
-            <meshStandardMaterial color="#f8fafc" metalness={0.9} roughness={0.2} wireframe />
+            <meshStandardMaterial color="#e8e5dd" metalness={0.9} roughness={0.22} wireframe />
           </mesh>
         </group>
       )}
 
-      {/* Fixed Full Canopy with Stadium Lighting Pods */}
+      {/* Fixed Halo Canopy with lighting pods */}
       {roof === 'fixed' && (
         <group>
           <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.6, 0]} castShadow>
             <ringGeometry args={[30, 46, 64]} />
-            <meshStandardMaterial color="#1e293b" metalness={0.8} roughness={0.3} side={THREE.DoubleSide} />
+            <meshStandardMaterial color="#22262d" metalness={0.8} roughness={0.32} side={THREE.DoubleSide} />
           </mesh>
           {Array.from({ length: 16 }).map((_, i) => {
             const rad = (i * Math.PI * 2) / 16;
             return (
               <mesh key={i} position={[Math.sin(rad) * 38, -0.2, Math.cos(rad) * 38]}>
                 <boxGeometry args={[1.6, 0.4, 2.8]} />
-                <meshBasicMaterial color="#ffffff" />
+                <meshBasicMaterial color="#fff3d6" />
               </mesh>
             );
           })}
@@ -1266,122 +1585,58 @@ function MasterRoofCanopy({ config }: { config: StadiumConfig }) {
 }
 
 // =============================================================================
-// 7. DYNAMIC ENVIRONMENT LIGHTING & SKY ATMOSPHERE
+// 7. CORNER FLOODLIGHT TOWERS (lattice masts)
 // =============================================================================
-function DynamicEnvironmentSky({
-  background = 'night',
-  facade = 'lattice',
-}: {
-  background?: EnvironmentBackground;
-  facade?: string;
-}) {
-  const isNight = background === 'night';
-  const isSunset = background === 'sunset';
+function FloodlightTowers({ background }: { background: EnvironmentBackground }) {
   const isDay = background === 'day';
-  const isCyber = background === 'cyberpunk';
-  const isDesert = background === 'desert';
-
-  const sunPos: [number, number, number] = isSunset ? [180, 26, 130] : [150, 28, 110];
+  // Off the default 45° camera diagonal so the masts never block the hero sightline
+  const positions: [number, number, number][] = [
+    [84, 0.4, 22],
+    [22, 0.4, 84],
+    [-84, 0.4, -22],
+    [-22, 0.4, -84],
+  ];
 
   return (
     <group>
-      <ambientLight
-        intensity={isDay ? 1.1 : isSunset ? 0.75 : isCyber ? 0.65 : 0.5}
-        color={isDay ? '#bae6fd' : isSunset ? '#f472b6' : isCyber ? '#818cf8' : isDesert ? '#ca8a04' : '#64748b'}
-      />
-
-      <directionalLight
-        position={isDay ? [60, 140, 70] : isSunset ? [160, 36, 120] : [70, 110, 80]}
-        intensity={isDay ? 2.5 : isSunset ? 2.8 : isCyber ? 1.8 : 1.5}
-        color={isDay ? '#f8fafc' : isSunset ? '#fbbf24' : isCyber ? '#38bdf8' : isDesert ? '#f59e0b' : '#e2e8f0'}
-        castShadow
-        shadow-mapSize={[2048, 2048]}
-      />
-
-      <directionalLight
-        position={[-80, 80, -70]}
-        intensity={isCyber ? 1.6 : 0.9}
-        color={isCyber ? '#d946ef' : isSunset ? '#c084fc' : isDay ? '#38bdf8' : '#0284c7'}
-      />
-
-      {(isSunset || isDesert) && (
-        <group position={sunPos}>
-          <mesh>
-            <sphereGeometry args={[18, 32, 32]} />
-            <meshBasicMaterial color={isSunset ? '#fb923c' : '#f59e0b'} />
-          </mesh>
-          <pointLight intensity={320} distance={260} color={isSunset ? '#f97316' : '#d97706'} />
-        </group>
-      )}
-
-      {Array.from({ length: 8 }).map((_, i) => {
-        const rad = (i * Math.PI * 2) / 8;
-        return (
-          <pointLight
-            key={i}
-            position={[Math.sin(rad) * 60, 14, Math.cos(rad) * 60]}
-            intensity={isDay ? 90 : isCyber ? 220 : 190}
-            distance={75}
-            color={isCyber ? '#06b6d4' : facade === 'traditional' || isDesert ? '#f59e0b' : '#fbbf24'}
-          />
-        );
-      })}
-
-      {[
-        [55, 0, 55],
-        [-55, 0, 55],
-        [55, 0, -55],
-        [-55, 0, -55],
-      ].map(([x, , z], i) => (
-        <group key={i} position={[x, 0.4, z]} rotation={[0, Math.atan2(-x, -z), 0]}>
-          {/* Lattice mast: central column with ring stiffeners */}
-          <mesh position={[0, 14, 0]} castShadow>
+      {positions.map((p, i) => (
+        <group key={i} position={p} rotation={[0, Math.atan2(-p[0], -p[2]), 0]}>
+          <mesh position={[0, 14, 0]}>
             <cylinderGeometry args={[0.45, 0.95, 28, 10]} />
-            <meshStandardMaterial color="#64748b" metalness={0.9} roughness={0.3} />
+            <meshStandardMaterial color="#565c66" metalness={0.9} roughness={0.32} />
           </mesh>
           {[5, 11, 17, 23].map((y, j) => (
             <mesh key={j} position={[0, y, 0]} rotation={[Math.PI / 2, 0, 0]}>
               <torusGeometry args={[(0.95 - (y / 28) * 0.42) * 1.15, 0.07, 8, 20]} />
-              <meshStandardMaterial color="#94a3b8" metalness={0.9} roughness={0.3} />
+              <meshStandardMaterial color="#8a8f98" metalness={0.9} roughness={0.3} />
             </mesh>
           ))}
-          {/* Head frame with lamp bank angled toward the pitch */}
           <group position={[0, 29, 0]} rotation={[0.5, 0, 0]}>
-            <mesh castShadow>
+            <mesh>
               <boxGeometry args={[6.5, 3.6, 0.7]} />
-              <meshStandardMaterial color="#334155" metalness={0.85} roughness={0.3} />
+              <meshStandardMaterial color="#2c3138" metalness={0.85} roughness={0.3} />
             </mesh>
             {Array.from({ length: 8 }).map((_, l) => (
               <mesh key={l} position={[-2.4 + (l % 4) * 1.6, l < 4 ? 0.85 : -0.85, 0.42]}>
                 <boxGeometry args={[1.1, 1.1, 0.25]} />
-                <meshBasicMaterial color={isDay ? '#cbd5e1' : '#ffffff'} />
+                <meshBasicMaterial color={isDay ? '#b8bdc4' : '#fff3d6'} />
               </mesh>
             ))}
           </group>
-          <pointLight position={[0, 26, 3]} intensity={isDay ? 40 : 210} distance={170} color={isCyber ? '#a5f3fc' : '#f0f9ff'} castShadow />
+          <pointLight position={[0, 26, 3]} intensity={isDay ? 25 : 120} distance={60} color="#fff3d6" />
         </group>
       ))}
-
-      {!isDay && (
-        <Stars
-          radius={280}
-          depth={60}
-          count={isNight ? 3500 : isCyber ? 2500 : isDesert ? 2000 : 1000}
-          factor={isCyber ? 5 : 4}
-          fade
-          speed={0.3}
-        />
-      )}
     </group>
   );
 }
 
 // =============================================================================
-// 8. JUMBOTRON SCREENS & ADD-ONS (Fan plaza, kiosks, solar)
+// 8. JUMBOTRONS, SOLAR, KIOSKS & FLAG AVENUE
 // =============================================================================
 function StadiumAddons({ config }: { config: StadiumConfig }) {
   const hasFanZone = config.addons.hasFanZone;
   const hasFoodCourts = config.addons.hasFoodCourts;
+  const accent = config.materials.accentColor;
 
   return (
     <group>
@@ -1397,17 +1652,16 @@ function StadiumAddons({ config }: { config: StadiumConfig }) {
               >
                 <mesh castShadow>
                   <boxGeometry args={[16, 8.5, 0.8]} />
-                  <meshStandardMaterial color="#020617" roughness={0.2} metalness={0.8} />
+                  <meshStandardMaterial color="#0a0c10" roughness={0.22} metalness={0.8} />
                 </mesh>
                 <mesh position={[0, 0, 0.45]}>
                   <planeGeometry args={[15.2, 7.8]} />
-                  <meshStandardMaterial color="#0284c7" emissive="#38bdf8" emissiveIntensity={0.8} />
+                  <meshStandardMaterial color="#101820" emissive={accent} emissiveIntensity={0.7} />
                 </mesh>
-                {/* Anti-sway tension cables to the roof ring */}
                 {[-6, 6].map((cx, j) => (
                   <mesh key={j} position={[cx, 5.6, 0]} rotation={[0, 0, cx > 0 ? -0.35 : 0.35]}>
                     <cylinderGeometry args={[0.04, 0.04, 6, 6]} />
-                    <meshStandardMaterial color="#94a3b8" metalness={0.9} />
+                    <meshStandardMaterial color="#8a8f98" metalness={0.9} />
                   </mesh>
                 ))}
               </group>
@@ -1416,19 +1670,19 @@ function StadiumAddons({ config }: { config: StadiumConfig }) {
         </group>
       )}
 
-      {/* Photovoltaic solar array on the south roof slope */}
+      {/* Photovoltaic solar arrays */}
       {config.addons.hasSolarPanels && (
         <group rotation={[-Math.PI / 2, 0, 0]} position={[0, 27.6, 0]}>
           {Array.from({ length: 4 }).map((_, ring) => (
             <mesh key={ring}>
               <ringGeometry args={[54 + ring * 5.5, 58 + ring * 5.5, 48]} />
-              <meshStandardMaterial color="#0f172a" metalness={0.95} roughness={0.15} side={THREE.DoubleSide} />
+              <meshStandardMaterial color="#14181f" metalness={0.95} roughness={0.18} side={THREE.DoubleSide} />
             </mesh>
           ))}
         </group>
       )}
 
-      {/* Fan plaza: merchandising & refreshment kiosks */}
+      {/* Fan plaza & food kiosks */}
       {(hasFanZone || hasFoodCourts) && (
         <group>
           {Array.from({ length: 10 }).map((_, i) => {
@@ -1441,23 +1695,19 @@ function StadiumAddons({ config }: { config: StadiumConfig }) {
                 position={[Math.sin(rad) * r, 0.4, Math.cos(rad) * r]}
                 rotation={[0, -rad + Math.PI, 0]}
               >
-                {/* Stall body */}
                 <mesh position={[0, 1.4, 0]} castShadow>
                   <boxGeometry args={[4.2, 2.6, 2.4]} />
-                  <meshStandardMaterial color={isFood ? '#7c2d12' : '#1e293b'} roughness={0.6} metalness={0.2} />
+                  <meshStandardMaterial color={isFood ? '#5c3218' : '#22262d'} roughness={0.62} metalness={0.2} />
                 </mesh>
-                {/* Serving counter */}
                 <mesh position={[0, 1.0, 1.45]}>
                   <boxGeometry args={[4.2, 0.25, 0.8]} />
-                  <meshStandardMaterial color="#e7e5e4" roughness={0.5} />
+                  <meshStandardMaterial color="#d5d2c8" roughness={0.5} />
                 </mesh>
-                {/* Pyramid awning */}
                 <mesh position={[0, 3.4, 0]} rotation={[0, Math.PI / 4, 0]} castShadow>
                   <coneGeometry args={[3.2, 1.4, 4]} />
-                  <meshStandardMaterial color={isFood ? '#b45309' : '#334155'} roughness={0.55} />
+                  <meshStandardMaterial color={isFood ? '#8a5a24' : '#2c3138'} roughness={0.58} />
                 </mesh>
-                {/* Warm stall light */}
-                <pointLight position={[0, 2.4, 1.4]} intensity={9} distance={14} color="#fbbf24" />
+                <pointLight position={[0, 2.4, 1.4]} intensity={9} distance={14} color="#ffdf9e" />
               </group>
             );
           })}
@@ -1467,9 +1717,6 @@ function StadiumAddons({ config }: { config: StadiumConfig }) {
   );
 }
 
-// =============================================================================
-// 8b. CEREMONIAL PLAZA FLAG ROW (Animated)
-// =============================================================================
 function PlazaFlagRow() {
   const flagsRef = useRef<(THREE.Mesh | null)[]>([]);
 
@@ -1482,27 +1729,25 @@ function PlazaFlagRow() {
 
   return (
     <group>
-      {/* Flag avenue flanking the main south approach */}
       {[-1, 1].map((side) =>
         Array.from({ length: 5 }).map((_, i) => {
-          const key = `${side}-${i}`;
           const z = 76 + i * 7;
           return (
-            <group key={key} position={[side * 11, 0.4, z]}>
+            <group key={`${side}-${i}`} position={[side * 11, 0.4, z]}>
               <mesh position={[0, 5, 0]} castShadow>
                 <cylinderGeometry args={[0.07, 0.1, 10, 8]} />
-                <meshStandardMaterial color="#e7e5e4" metalness={0.85} roughness={0.25} />
+                <meshStandardMaterial color="#d5d2c8" metalness={0.85} roughness={0.28} />
               </mesh>
               <mesh position={[0, 10, 0]}>
                 <sphereGeometry args={[0.12, 10, 10]} />
-                <meshStandardMaterial color="#fbbf24" metalness={0.9} roughness={0.2} />
+                <meshStandardMaterial color="#c9a25e" metalness={0.9} roughness={0.2} />
               </mesh>
               <mesh
                 ref={(m) => { flagsRef.current[i * 2 + (side === 1 ? 0 : 1)] = m as THREE.Mesh | null; }}
                 position={[0.75, 9.1, 0]}
               >
                 <planeGeometry args={[1.5, 1.0]} />
-                <meshStandardMaterial color="#b45309" side={THREE.DoubleSide} roughness={0.8} />
+                <meshStandardMaterial color="#8a5a24" side={THREE.DoubleSide} roughness={0.8} />
               </mesh>
             </group>
           );
@@ -1513,26 +1758,21 @@ function PlazaFlagRow() {
 }
 
 // =============================================================================
-// 9. MASTER ASSEMBLED ARCHITECTURAL STADIUM
+// 9. MASTER ASSEMBLED STADIUM
 // =============================================================================
-function MasterStadiumModel({ config }: { config: StadiumConfig }) {
+function MasterStadiumModel({ config, mini = false }: { config: StadiumConfig; mini?: boolean }) {
   const landscape = config.landscape ?? DEFAULT_STADIUM_CONFIG.landscape;
   const background = landscape?.background ?? 'night';
 
   return (
     <group>
-      {/* Ground Landscape */}
       <DynamicLandscapeGround landscape={landscape} />
-
-      {/* Football Pitch / Olympic Athletics Running Track */}
       <MasterPitchAndTrack
         type={config.type}
         pitchDesign={config.interior.pitchDesign}
         hasPlayerTunnel={config.interior.hasPlayerTunnel}
         hasScoreboard={config.interior.hasScoreboard}
       />
-
-      {/* Stepped Grandstand Bowl */}
       <RealisticGrandstands
         type={config.type}
         tiers={config.seating.tiers}
@@ -1540,60 +1780,59 @@ function MasterStadiumModel({ config }: { config: StadiumConfig }) {
         capacity={config.seating.capacity}
         hasVip={config.seating.hasVip}
       />
-
-      {/* Signature Exterior Facade */}
       <ArchitecturalFacade config={config} />
-
-      {/* Engineered Roof Canopy or Bio-Dome */}
       <MasterRoofCanopy config={config} />
-
-      {/* Visible 3D Stadium Entrances, VIP Portes-Cochères & Parking */}
       <VisibleStadiumEntrances config={config} />
-
-      {/* Dynamic Lighting & Sky */}
-      <DynamicEnvironmentSky background={background} facade={config.facade} />
-
-      {/* Jumbotrons, PV Solar & Add-Ons */}
+      {!mini && <FloodlightTowers background={background} />}
       <StadiumAddons config={config} />
-
-      {/* Ceremonial flag avenue on the approach plaza */}
       <PlazaFlagRow />
     </group>
   );
 }
 
-// =============================================================================
-// 10. CAMERA & TURNTABLE CONTROLS
-// =============================================================================
-function TurntableAnimation({ active }: { active: boolean }) {
-  const { scene } = useThree();
+/** Rotates only the stadium model on a slow turntable — sky and lighting stay fixed. */
+function TurntableGroup({ active, children }: { active: boolean; children: React.ReactNode }) {
+  const ref = useRef<THREE.Group>(null);
   useFrame((_, delta) => {
-    if (active) {
-      scene.rotation.y += delta * 0.08;
-    }
+    if (active && ref.current) ref.current.rotation.y += delta * 0.08;
   });
-  return null;
+  return <group ref={ref}>{children}</group>;
 }
 
 // =============================================================================
-// 11. EXPORTED STADIUM 3D PREVIEW COMPONENT
+// 10. EXPORTED STADIUM 3D PREVIEW + PROFESSIONAL VIEWER UI
 // =============================================================================
 interface Props {
   config?: StadiumConfig;
   interactive?: boolean;
   autoRotate?: boolean;
   className?: string;
-  presetCamera?: 'aerial' | 'pitch' | 'facade';
+  presetCamera?: ViewerView;
   showQuickControls?: boolean;
+  /** 'mini' renders a lightweight version (no shadows, 1x dpr) for multi-canvas pages. */
+  quality?: 'full' | 'mini';
 }
+
+const VIEW_BUTTONS: Array<{ id: ViewerView; label: string }> = [
+  { id: 'perspective', label: '3D' },
+  { id: 'front', label: 'Front' },
+  { id: 'back', label: 'Back' },
+  { id: 'left', label: 'Left' },
+  { id: 'right', label: 'Right' },
+  { id: 'top', label: 'Top' },
+  { id: 'aerial', label: 'Aerial' },
+  { id: 'pitch', label: 'Pitch' },
+  { id: 'entry', label: 'Entry' },
+];
 
 export function StadiumPreview3D({
   config: configProp,
   interactive = false,
   autoRotate = false,
   className,
-  presetCamera = 'aerial',
+  presetCamera = 'perspective',
   showQuickControls = true,
+  quality = 'full',
 }: Props) {
   const storeConfig = useStadiumStore((s) => s.config);
   const updateLandscape = useStadiumStore((s) => s.updateLandscape);
@@ -1602,53 +1841,63 @@ export function StadiumPreview3D({
   const currentBg = activeConfig.landscape?.background ?? 'night';
   const currentLandscape = activeConfig.landscape?.landscapeStyle ?? 'olympic';
 
-  const [activeCam, setActiveCam] = useState<'aerial' | 'pitch' | 'facade'>(presetCamera);
-
-  const cameraPosition = useMemo((): [number, number, number] => {
-    if (activeCam === 'pitch') return [0, 8, 30];
-    if (activeCam === 'facade') return [0, 16, 102]; // Directly facing South Grand Entrance
-    return [95, 62, 95];
-  }, [activeCam]);
+  const [view, setView] = useState<ViewerView>(presetCamera);
+  const [wireframe, setWireframe] = useState(false);
+  const [showGrid, setShowGrid] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
+  const isMini = quality === 'mini';
 
   return (
     <div className={`relative w-full h-full select-none ${className ?? ''}`}>
       <Canvas
-        shadows
-        camera={{ position: cameraPosition, fov: 44 }}
+        shadows={!isMini}
+        dpr={isMini ? 1 : [1, 2]}
+        camera={{ position: CAMERA_VIEWS[presetCamera].pos, fov: 42, near: 1, far: 1600 }}
         gl={{
-          antialias: true,
+          antialias: !isMini,
           alpha: true,
-          powerPreference: 'high-performance',
+          powerPreference: isMini ? 'low-power' : 'high-performance',
+        }}
+        onCreated={({ gl }) => {
+          gl.toneMapping = THREE.ACESFilmicToneMapping;
+          gl.toneMappingExposure = 1.05;
         }}
         style={{ background: 'transparent' }}
       >
         <Suspense fallback={null}>
-          <MasterStadiumModel config={activeConfig} />
+          <DynamicEnvironmentSky background={currentBg} mini={isMini} />
+
+          <TurntableGroup active={!interactive && autoRotate}>
+            <MasterStadiumModel config={activeConfig} mini={isMini} />
+          </TurntableGroup>
+
+          <SceneGrid visible={showGrid} />
+          <WireframeOverride active={wireframe} />
+          <CameraRig view={view} />
 
           {interactive && (
             <OrbitControls
+              makeDefault
               enablePan={true}
               enableZoom={true}
               enableRotate={true}
-              minDistance={26}
-              maxDistance={250}
-              maxPolarAngle={Math.PI / 2.05}
+              minDistance={22}
+              maxDistance={260}
+              maxPolarAngle={Math.PI / 2.04}
               autoRotate={autoRotate}
-              autoRotateSpeed={0.6}
-              dampingFactor={0.06}
+              autoRotateSpeed={0.55}
+              dampingFactor={0.07}
             />
           )}
-
-          <TurntableAnimation active={!interactive && autoRotate} />
         </Suspense>
       </Canvas>
 
-      {/* Quick Environment & Camera Floating Toolbar */}
+      {/* ── Viewer overlay chrome ── */}
       {showQuickControls && (
-        <div className="absolute top-3 right-4 z-20 flex flex-col gap-2 items-end pointer-events-auto">
-          {/* Sky Atmosphere Selector */}
-          <div className="flex items-center gap-0.5 p-1 vp-chip">
-            <span className="text-[9px] font-mono uppercase tracking-widest text-paper/40 px-2">Sky</span>
+        <div className="absolute top-3 right-4 z-20 flex flex-col gap-1.5 items-end max-w-[calc(100%-2rem)] pointer-events-auto">
+          {/* Sky */}
+          <div className="flex items-center gap-0.5 p-1 vp-chip overflow-x-auto">
+            <span className="text-[9px] font-mono uppercase tracking-widest text-paper/40 px-2 shrink-0">Sky</span>
             {BACKGROUND_PRESETS.map((preset) => {
               const isActive = currentBg === preset.value;
               return (
@@ -1656,22 +1905,24 @@ export function StadiumPreview3D({
                   key={preset.value}
                   onClick={() => updateLandscape({ background: preset.value })}
                   title={`${preset.label}: ${preset.description}`}
-                  className={`flex items-center gap-1 px-2 py-1 text-xs transition-colors ${
-                    isActive
-                      ? 'bg-brass text-paper font-medium'
-                      : 'text-paper/50 hover:text-paper hover:bg-white/[0.07]'
-                  }`}
+                  className={cn(
+                    'flex items-center gap-1.5 px-2 py-1 text-[10px] font-mono transition-colors shrink-0',
+                    isActive ? 'bg-brass text-paper' : 'text-paper/55 hover:text-paper hover:bg-white/[0.07]'
+                  )}
                 >
-                  <span>{preset.icon}</span>
-                  <span className="text-[10px] capitalize hidden sm:inline">{preset.value}</span>
+                  <span
+                    className="w-2.5 h-2.5 rounded-full border border-white/25 shrink-0"
+                    style={{ background: `linear-gradient(135deg, ${preset.skyColor}, ${preset.horizonColor})` }}
+                  />
+                  <span className="capitalize hidden sm:inline">{preset.value}</span>
                 </button>
               );
             })}
           </div>
 
-          {/* Landscape Style Selector */}
-          <div className="flex items-center gap-0.5 p-1 vp-chip">
-            <span className="text-[9px] font-mono uppercase tracking-widest text-paper/40 px-2">Plaza</span>
+          {/* Plaza */}
+          <div className="flex items-center gap-0.5 p-1 vp-chip overflow-x-auto">
+            <span className="text-[9px] font-mono uppercase tracking-widest text-paper/40 px-2 shrink-0">Plaza</span>
             {LANDSCAPE_STYLES.map((land) => {
               const isActive = currentLandscape === land.value;
               return (
@@ -1679,40 +1930,95 @@ export function StadiumPreview3D({
                   key={land.value}
                   onClick={() => updateLandscape({ landscapeStyle: land.value })}
                   title={`${land.label}: ${land.description}`}
-                  className={`flex items-center gap-1 px-2 py-1 text-xs transition-colors ${
-                    isActive
-                      ? 'bg-paper text-ink font-medium'
-                      : 'text-paper/50 hover:text-paper hover:bg-white/[0.07]'
-                  }`}
+                  className={cn(
+                    'flex items-center gap-1.5 px-2 py-1 text-[10px] font-mono transition-colors shrink-0',
+                    isActive ? 'bg-paper text-ink font-medium' : 'text-paper/55 hover:text-paper hover:bg-white/[0.07]'
+                  )}
                 >
-                  <span>{land.icon}</span>
-                  <span className="text-[10px] capitalize hidden sm:inline">{land.value}</span>
+                  <span
+                    className="w-2.5 h-2.5 rounded-full border border-white/25 shrink-0"
+                    style={{ backgroundColor: land.accent }}
+                  />
+                  <span className="capitalize hidden sm:inline">{land.value}</span>
                 </button>
               );
             })}
           </div>
 
-          {/* Camera Presets: Aerial, Pitch, Entrance View */}
-          <div className="flex items-center gap-0.5 p-1 vp-chip">
-            <span className="text-[9px] font-mono uppercase tracking-widest text-paper/40 px-2">View</span>
-            {[
-              { id: 'aerial' as const, label: 'Aerial', icon: Landmark },
-              { id: 'pitch' as const, label: 'Pitch', icon: Camera },
-              { id: 'facade' as const, label: 'Entrance', icon: Building2 },
-            ].map((cam) => (
+          {/* Camera views */}
+          <div className="flex items-center gap-0.5 p-1 vp-chip overflow-x-auto">
+            <span className="text-[9px] font-mono uppercase tracking-widest text-paper/40 px-2 shrink-0">View</span>
+            {VIEW_BUTTONS.map((v) => (
               <button
-                key={cam.id}
-                onClick={() => setActiveCam(cam.id)}
-                className={`flex items-center gap-1 px-2 py-1 text-[10px] font-medium transition-colors ${
-                  activeCam === cam.id
-                    ? 'bg-paper text-ink'
-                    : 'text-paper/50 hover:text-paper hover:bg-white/[0.07]'
-                }`}
+                key={v.id}
+                onClick={() => setView(v.id)}
+                className={cn(
+                  'px-2 py-1 text-[10px] font-mono uppercase tracking-wide transition-colors shrink-0',
+                  view === v.id ? 'bg-paper text-ink font-medium' : 'text-paper/55 hover:text-paper hover:bg-white/[0.07]'
+                )}
               >
-                <cam.icon size={11} />
-                <span>{cam.label}</span>
+                {v.label}
               </button>
             ))}
+            <button
+              onClick={() => setView('perspective')}
+              title="Reset camera"
+              className="px-1.5 py-1 text-paper/55 hover:text-paper hover:bg-white/[0.07] transition-colors shrink-0"
+            >
+              <RotateCcw size={11} />
+            </button>
+          </div>
+
+          {/* Display toggles */}
+          <div className="flex items-center gap-0.5 p-1 vp-chip">
+            {[
+              { active: wireframe, toggle: () => setWireframe((w) => !w), icon: Box, title: 'Wireframe mode' },
+              { active: showGrid, toggle: () => setShowGrid((g) => !g), icon: Grid3x3, title: 'Grid helper' },
+              { active: showInfo, toggle: () => setShowInfo((i) => !i), icon: Info, title: 'Model information' },
+            ].map(({ active, toggle, icon: Icon, title }) => (
+              <button
+                key={title}
+                onClick={toggle}
+                title={title}
+                className={cn(
+                  'p-1.5 transition-colors',
+                  active ? 'bg-brass text-paper' : 'text-paper/55 hover:text-paper hover:bg-white/[0.07]'
+                )}
+              >
+                <Icon size={12} />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Model information panel */}
+      {showQuickControls && showInfo && (
+        <div className="absolute bottom-3 left-4 z-20 vp-chip px-4 py-3 pointer-events-auto max-w-[240px]">
+          <div className="flex items-center gap-2 mb-2 pb-2 border-b border-white/10">
+            <Eye size={12} className="text-brass shrink-0" />
+            <span className="text-[11px] font-medium text-paper/90 truncate">{activeConfig.name}</span>
+          </div>
+          <dl className="space-y-1 text-[10px] font-mono">
+            {[
+              ['Type', activeConfig.type.replace('-', ' ')],
+              ['Facade', activeConfig.facade],
+              ['Roof', activeConfig.roof],
+              ['Capacity', `${activeConfig.seating.capacity.toLocaleString()} seats`],
+              ['Tiers', String(activeConfig.seating.tiers)],
+              ['Est. diameter', '≈ 152 m'],
+              ['Est. height', activeConfig.type === 'indoor' ? '≈ 33 m' : '≈ 27 m'],
+            ].map(([k, v]) => (
+              <div key={k} className="flex justify-between gap-4">
+                <dt className="text-paper/45 uppercase tracking-wider">{k}</dt>
+                <dd className="text-paper/85 capitalize text-right">{v}</dd>
+              </div>
+            ))}
+          </dl>
+          <div className="mt-2 pt-2 border-t border-white/10 flex items-center gap-1.5 text-[9px] font-mono text-paper/40">
+            <CameraIcon size={10} />
+            <span>Procedural WebGL model · scale 1:500</span>
+            <Building2 size={10} className="ml-auto" />
           </div>
         </div>
       )}

@@ -1,6 +1,6 @@
 'use client';
 
-import { Monitor, Touchpad, ArrowRight } from 'lucide-react';
+import { Monitor, Touchpad } from 'lucide-react';
 import { StadiumPreview3D } from '@/components/stadium-viewer/StadiumPreview3D';
 
 export function MuseumSetup() {
@@ -46,7 +46,7 @@ export function MuseumSetup() {
                 <span>Large display — live output</span>
               </div>
               <div className="h-44 sm:h-52 w-full bg-viewport border border-ink/30 overflow-hidden relative">
-                <StadiumPreview3D autoRotate={true} className="pointer-events-none" />
+                <StadiumPreview3D autoRotate={true} showQuickControls={false} quality="mini" className="pointer-events-none" />
                 <div className="absolute top-2 right-2 px-2 py-0.5 vp-chip text-[9px] font-mono">
                   4K · 60 FPS
                 </div>
@@ -124,18 +124,6 @@ export function MuseumSetup() {
             </div>
           </div>
         ))}
-      </div>
-
-      <div className="mt-6 flex justify-end">
-        <button
-          onClick={() => {
-            const el = document.getElementById('exhibition-setup');
-            el?.scrollIntoView({ behavior: 'smooth' });
-          }}
-          className="hidden"
-        >
-          <ArrowRight size={14} />
-        </button>
       </div>
     </div>
   );

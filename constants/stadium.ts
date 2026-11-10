@@ -19,7 +19,7 @@ export const DEFAULT_STADIUM_CONFIG: StadiumConfig = {
   roof: 'retractable',
   seating: {
     capacity: 65000,
-    primaryColor: '#6366f1',
+    primaryColor: '#8e3b2f',
     hasVip: true,
     hasPremium: true,
     tiers: 3,
