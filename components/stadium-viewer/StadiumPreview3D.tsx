@@ -1897,7 +1897,7 @@ export function StadiumPreview3D({
         <div className="absolute top-3 right-4 z-20 flex flex-col gap-1.5 items-end max-w-[calc(100%-2rem)] pointer-events-auto">
           {/* Sky */}
           <div className="flex items-center gap-0.5 p-1 vp-chip overflow-x-auto">
-            <span className="text-[9px] font-mono uppercase tracking-widest text-paper/40 px-2 shrink-0">Sky</span>
+            <span className="text-[9px] font-mono uppercase tracking-widest text-chip/40 px-2 shrink-0">Sky</span>
             {BACKGROUND_PRESETS.map((preset) => {
               const isActive = currentBg === preset.value;
               return (
@@ -1907,7 +1907,7 @@ export function StadiumPreview3D({
                   title={`${preset.label}: ${preset.description}`}
                   className={cn(
                     'flex items-center gap-1.5 px-2 py-1 text-[10px] font-mono transition-colors shrink-0',
-                    isActive ? 'bg-brass text-paper' : 'text-paper/55 hover:text-paper hover:bg-white/[0.07]'
+                    isActive ? 'bg-brass text-chip-ink' : 'text-chip/55 hover:text-chip hover:bg-white/[0.07]'
                   )}
                 >
                   <span
@@ -1922,7 +1922,7 @@ export function StadiumPreview3D({
 
           {/* Plaza */}
           <div className="flex items-center gap-0.5 p-1 vp-chip overflow-x-auto">
-            <span className="text-[9px] font-mono uppercase tracking-widest text-paper/40 px-2 shrink-0">Plaza</span>
+            <span className="text-[9px] font-mono uppercase tracking-widest text-chip/40 px-2 shrink-0">Plaza</span>
             {LANDSCAPE_STYLES.map((land) => {
               const isActive = currentLandscape === land.value;
               return (
@@ -1932,7 +1932,7 @@ export function StadiumPreview3D({
                   title={`${land.label}: ${land.description}`}
                   className={cn(
                     'flex items-center gap-1.5 px-2 py-1 text-[10px] font-mono transition-colors shrink-0',
-                    isActive ? 'bg-paper text-ink font-medium' : 'text-paper/55 hover:text-paper hover:bg-white/[0.07]'
+                    isActive ? 'bg-chip text-chip-ink font-medium' : 'text-chip/55 hover:text-chip hover:bg-white/[0.07]'
                   )}
                 >
                   <span
@@ -1947,14 +1947,14 @@ export function StadiumPreview3D({
 
           {/* Camera views */}
           <div className="flex items-center gap-0.5 p-1 vp-chip overflow-x-auto">
-            <span className="text-[9px] font-mono uppercase tracking-widest text-paper/40 px-2 shrink-0">View</span>
+            <span className="text-[9px] font-mono uppercase tracking-widest text-chip/40 px-2 shrink-0">View</span>
             {VIEW_BUTTONS.map((v) => (
               <button
                 key={v.id}
                 onClick={() => setView(v.id)}
                 className={cn(
                   'px-2 py-1 text-[10px] font-mono uppercase tracking-wide transition-colors shrink-0',
-                  view === v.id ? 'bg-paper text-ink font-medium' : 'text-paper/55 hover:text-paper hover:bg-white/[0.07]'
+                  view === v.id ? 'bg-chip text-chip-ink font-medium' : 'text-chip/55 hover:text-chip hover:bg-white/[0.07]'
                 )}
               >
                 {v.label}
@@ -1963,7 +1963,7 @@ export function StadiumPreview3D({
             <button
               onClick={() => setView('perspective')}
               title="Reset camera"
-              className="px-1.5 py-1 text-paper/55 hover:text-paper hover:bg-white/[0.07] transition-colors shrink-0"
+              className="px-1.5 py-1 text-chip/55 hover:text-chip hover:bg-white/[0.07] transition-colors shrink-0"
             >
               <RotateCcw size={11} />
             </button>
@@ -1982,7 +1982,7 @@ export function StadiumPreview3D({
                 title={title}
                 className={cn(
                   'p-1.5 transition-colors',
-                  active ? 'bg-brass text-paper' : 'text-paper/55 hover:text-paper hover:bg-white/[0.07]'
+                  active ? 'bg-brass text-chip-ink' : 'text-chip/55 hover:text-chip hover:bg-white/[0.07]'
                 )}
               >
                 <Icon size={12} />
@@ -1997,7 +1997,7 @@ export function StadiumPreview3D({
         <div className="absolute bottom-3 left-4 z-20 vp-chip px-4 py-3 pointer-events-auto max-w-[240px]">
           <div className="flex items-center gap-2 mb-2 pb-2 border-b border-white/10">
             <Eye size={12} className="text-brass shrink-0" />
-            <span className="text-[11px] font-medium text-paper/90 truncate">{activeConfig.name}</span>
+            <span className="text-[11px] font-medium text-chip/90 truncate">{activeConfig.name}</span>
           </div>
           <dl className="space-y-1 text-[10px] font-mono">
             {[
@@ -2010,12 +2010,12 @@ export function StadiumPreview3D({
               ['Est. height', activeConfig.type === 'indoor' ? '≈ 33 m' : '≈ 27 m'],
             ].map(([k, v]) => (
               <div key={k} className="flex justify-between gap-4">
-                <dt className="text-paper/45 uppercase tracking-wider">{k}</dt>
-                <dd className="text-paper/85 capitalize text-right">{v}</dd>
+                <dt className="text-chip/45 uppercase tracking-wider">{k}</dt>
+                <dd className="text-chip/85 capitalize text-right">{v}</dd>
               </div>
             ))}
           </dl>
-          <div className="mt-2 pt-2 border-t border-white/10 flex items-center gap-1.5 text-[9px] font-mono text-paper/40">
+          <div className="mt-2 pt-2 border-t border-white/10 flex items-center gap-1.5 text-[9px] font-mono text-chip/40">
             <CameraIcon size={10} />
             <span>Procedural WebGL model · scale 1:500</span>
             <Building2 size={10} className="ml-auto" />

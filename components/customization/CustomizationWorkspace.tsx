@@ -108,8 +108,8 @@ export function CustomizationWorkspace() {
 
           {/* Telemetry tag */}
           <div className="absolute top-3 left-4 vp-chip px-3 py-2 text-xs font-mono pointer-events-none hidden sm:block">
-            <div className="text-paper/90 font-medium mb-1">{config.name}</div>
-            <div className="text-[11px] space-x-2 text-paper/50">
+            <div className="text-chip/90 font-medium mb-1">{config.name}</div>
+            <div className="text-[11px] space-x-2 text-chip/50">
               <span>{config.seating.capacity.toLocaleString()} seats</span>
               <span>·</span>
               <span className="capitalize">{config.facade}</span>
@@ -125,8 +125,8 @@ export function CustomizationWorkspace() {
               className={cn(
                 'flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors',
                 autoRotate3D
-                  ? 'bg-brass text-paper'
-                  : 'text-paper/70 hover:text-paper hover:bg-white/[0.06]'
+                  ? 'bg-brass text-chip-ink'
+                  : 'text-chip/70 hover:text-chip hover:bg-white/[0.06]'
               )}
               title="Toggle automatic turntable rotation"
             >
@@ -137,7 +137,7 @@ export function CustomizationWorkspace() {
             <div className="w-px h-3.5 bg-white/10" />
 
             <div
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-paper/70 font-medium"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-chip/70 font-medium"
               title="Scroll mouse wheel or pinch to zoom"
             >
               <span className="text-[11px] font-mono">Zoom</span>
@@ -146,7 +146,7 @@ export function CustomizationWorkspace() {
             <div className="w-px h-3.5 bg-white/10" />
 
             <div
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-paper/70 font-medium"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-chip/70 font-medium"
               title="Right-click and drag or two-finger drag to pan"
             >
               <span className="text-[11px] font-mono">Pan</span>
@@ -156,7 +156,7 @@ export function CustomizationWorkspace() {
 
             <button
               onClick={() => setIsFullscreen(!isFullscreen)}
-              className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-paper/70 hover:text-paper hover:bg-white/[0.06] transition-colors"
+              className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-chip/70 hover:text-chip hover:bg-white/[0.06] transition-colors"
               title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen 3D stage'}
             >
               <Maximize2 size={12} />

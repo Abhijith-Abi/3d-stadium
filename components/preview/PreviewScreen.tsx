@@ -77,10 +77,10 @@ export function PreviewScreen() {
           {/* 3D viewport */}
           <div className="lg:col-span-8 h-[520px] bg-viewport border border-ink/20 relative overflow-hidden">
             <StadiumPreview3D interactive={true} autoRotate={true} />
-            <div className="absolute top-3 left-4 vp-chip px-3 py-1.5 text-xs font-mono text-paper/90 pointer-events-none">
+            <div className="absolute top-3 left-4 vp-chip px-3 py-1.5 text-xs font-mono text-chip/90 pointer-events-none">
               {config.name}
             </div>
-            <div className="absolute bottom-0 left-0 right-0 px-4 py-2.5 text-[10px] font-mono text-paper/50 pointer-events-none">
+            <div className="absolute bottom-0 left-0 right-0 px-4 py-2.5 text-[10px] font-mono text-chip/50 pointer-events-none">
               Drag rotate · Scroll zoom · Right-drag pan
             </div>
           </div>

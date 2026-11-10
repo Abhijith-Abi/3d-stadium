@@ -2,20 +2,22 @@
 
 /* ── Atelier Tokens — Paper, Ink & Bronze ──────────────────────────────────── */
 @theme {
-  --color-paper: #f2efe8;
-  --color-paper-raised: #eae6dc;
-  --color-paper-sunken: #e6e1d4;
-  --color-ink: #1c1a16;
-  --color-ink-soft: #3d3931;
-  --color-ink-muted: #77705f;
-  --color-line: #d5cfc0;
-  --color-line-strong: #b9b1a0;
-  --color-brass: #8f6b32;
-  --color-brass-deep: #6f5225;
-  --color-signal: #b3541e;
+  --color-paper: #0b1118;
+  --color-paper-raised: #131c27;
+  --color-paper-sunken: #0f1620;
+  --color-ink: #e6edf5;
+  --color-ink-soft: #b8c4d4;
+  --color-ink-muted: #8493a8;
+  --color-line: #223041;
+  --color-line-strong: #3a4d65;
+  --color-brass: #2dd4bf;
+  --color-brass-deep: #5eead4;
+  --color-signal: #fb7185;
 
-  --color-viewport: #101318;
-  --color-viewport-panel: rgba(16, 19, 24, 0.85);
+  --color-viewport: #05080d;
+  --color-chip: #eef3f7;
+  --color-chip-ink: #0f1b2d;
+  --color-viewport-panel: rgba(5, 8, 13, 0.85);
 
   --radius-sm: 2px;
   --radius-md: 3px;
@@ -78,8 +80,8 @@
   .vp-chip {
     background: var(--color-viewport-panel);
     backdrop-filter: blur(8px);
-    border: 1px solid rgba(242, 239, 232, 0.14);
-    color: #d8d3c6;
+    border: 1px solid rgba(238, 243, 247, 0.14);
+    color: #d3dde8;
   }
 
   /* Small caps section label, like drawing annotations */

@@ -79,7 +79,7 @@ export function ChooseModeScreen() {
             onClick={() => handleSelect('ai')}
             className="text-left p-8 bg-ink text-paper hover:bg-ink-soft transition-colors group flex flex-col min-h-[380px] relative"
           >
-            <div className="absolute top-0 right-8 bg-brass text-paper text-[10px] font-mono uppercase tracking-widest px-2.5 py-1 -translate-y-1/2">
+            <div className="absolute top-0 right-8 bg-brass text-chip-ink text-[10px] font-mono uppercase tracking-widest px-2.5 py-1 -translate-y-1/2">
               Recommended
             </div>
 

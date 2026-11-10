@@ -98,10 +98,10 @@ export function WelcomeScreen() {
               {/* Viewport chrome */}
               <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-2.5 text-[11px] font-mono pointer-events-none">
                 <div className="vp-chip px-3 py-1.5 pointer-events-none">
-                  <span className="text-paper/90">{config.name}</span>
+                  <span className="text-chip/90">{config.name}</span>
                 </div>
                 <div className="vp-chip px-2.5 py-1.5 pointer-events-none">
-                  <span className="text-paper/60">
+                  <span className="text-chip/60">
                     {config.seating.capacity.toLocaleString()} seats
                   </span>
                 </div>
@@ -109,7 +109,7 @@ export function WelcomeScreen() {
 
               <StadiumPreview3D interactive={true} autoRotate={true} />
 
-              <div className="absolute bottom-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-2.5 text-[10px] font-mono pointer-events-none text-paper/50">
+              <div className="absolute bottom-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-2.5 text-[10px] font-mono pointer-events-none text-chip/50">
                 <span>Drag rotate · Scroll zoom · Right-drag pan</span>
                 <span>Scale 1 : 500</span>
               </div>

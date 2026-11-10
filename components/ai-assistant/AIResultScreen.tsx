@@ -60,7 +60,7 @@ export function AIResultScreen() {
           {/* 3D viewport */}
           <div className="lg:col-span-7 h-[460px] bg-viewport border border-ink/20 relative overflow-hidden">
             <StadiumPreview3D config={config} interactive={true} autoRotate={true} />
-            <div className="absolute bottom-0 left-0 right-0 px-4 py-2.5 text-[10px] font-mono text-paper/50 pointer-events-none">
+            <div className="absolute bottom-0 left-0 right-0 px-4 py-2.5 text-[10px] font-mono text-chip/50 pointer-events-none">
               Drag to inspect the 3D structure
             </div>
           </div>

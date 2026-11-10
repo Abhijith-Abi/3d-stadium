@@ -86,15 +86,15 @@ function StadiumTypePanel() {
 }
 
 function FacadeThumbnailSvg({ style }: { style: string }) {
-  const ink = '#1c1a16';
-  const brass = '#8f6b32';
-  const muted = '#b9b1a0';
+  const ink = '#9fb3cc';
+  const brass = '#2dd4bf';
+  const muted = '#4a5d75';
   switch (style) {
     case 'lattice':
       return (
         <svg viewBox="0 0 160 90" className="w-full h-full object-cover">
-          <rect width="160" height="90" fill="#efece4" />
-          <path d="M 0,90 Q 80,45 160,90 Z" fill="#d5cfc0" opacity="0.7" />
+          <rect width="160" height="90" fill="#16212e" />
+          <path d="M 0,90 Q 80,45 160,90 Z" fill="#2a3a4e" opacity="0.7" />
           {Array.from({ length: 9 }).map((_, i) => (
             <line
               key={`cw-${i}`}
@@ -125,8 +125,8 @@ function FacadeThumbnailSvg({ style }: { style: string }) {
     case 'slats':
       return (
         <svg viewBox="0 0 160 90" className="w-full h-full object-cover">
-          <rect width="160" height="90" fill="#efece4" />
-          <path d="M 0,90 Q 80,40 160,90 Z" fill="#d5cfc0" opacity="0.8" />
+          <rect width="160" height="90" fill="#16212e" />
+          <path d="M 0,90 Q 80,40 160,90 Z" fill="#2a3a4e" opacity="0.8" />
           {Array.from({ length: 18 }).map((_, i) => (
             <path
               key={i}
@@ -142,20 +142,20 @@ function FacadeThumbnailSvg({ style }: { style: string }) {
     case 'geometric':
       return (
         <svg viewBox="0 0 160 90" className="w-full h-full object-cover">
-          <rect width="160" height="90" fill="#efece4" />
-          <polygon points="10,80 30,25 50,80" fill="#8f6b32" opacity="0.85" />
-          <polygon points="30,25 50,80 70,25" fill="#6f5225" opacity="0.9" />
-          <polygon points="50,80 70,25 90,80" fill="#b3541e" opacity="0.75" />
-          <polygon points="70,25 90,80 110,25" fill="#8f6b32" opacity="0.9" />
-          <polygon points="90,80 110,25 130,80" fill="#6f5225" opacity="0.8" />
-          <polygon points="110,25 130,80 150,25" fill="#b3541e" opacity="0.7" />
+          <rect width="160" height="90" fill="#16212e" />
+          <polygon points="10,80 30,25 50,80" fill="#2dd4bf" opacity="0.85" />
+          <polygon points="30,25 50,80 70,25" fill="#14b8a6" opacity="0.9" />
+          <polygon points="50,80 70,25 90,80" fill="#fb7185" opacity="0.75" />
+          <polygon points="70,25 90,80 110,25" fill="#2dd4bf" opacity="0.9" />
+          <polygon points="90,80 110,25 130,80" fill="#14b8a6" opacity="0.8" />
+          <polygon points="110,25 130,80 150,25" fill="#fb7185" opacity="0.7" />
         </svg>
       );
     case 'perforated':
       return (
         <svg viewBox="0 0 160 90" className="w-full h-full object-cover">
-          <rect width="160" height="90" fill="#efece4" />
-          <path d="M 5,85 Q 80,30 155,85 Z" fill="#d5cfc0" opacity="0.9" />
+          <rect width="160" height="90" fill="#16212e" />
+          <path d="M 5,85 Q 80,30 155,85 Z" fill="#2a3a4e" opacity="0.9" />
           {Array.from({ length: 7 }).map((_, r) =>
             Array.from({ length: 14 }).map((_, c) => (
               <circle
@@ -173,8 +173,8 @@ function FacadeThumbnailSvg({ style }: { style: string }) {
     case 'glass':
       return (
         <svg viewBox="0 0 160 90" className="w-full h-full object-cover">
-          <rect width="160" height="90" fill="#e6e1d4" />
-          <path d="M 0,85 Q 80,35 160,85 Z" fill="#b9b1a0" opacity="0.7" />
+          <rect width="160" height="90" fill="#1b2736" />
+          <path d="M 0,85 Q 80,35 160,85 Z" fill="#4a5d75" opacity="0.7" />
           {Array.from({ length: 12 }).map((_, i) => (
             <line
               key={i}
@@ -193,7 +193,7 @@ function FacadeThumbnailSvg({ style }: { style: string }) {
     case 'steel':
       return (
         <svg viewBox="0 0 160 90" className="w-full h-full object-cover">
-          <rect width="160" height="90" fill="#efece4" />
+          <rect width="160" height="90" fill="#16212e" />
           {Array.from({ length: 8 }).map((_, i) => (
             <g key={i}>
               <line x1={15 + i * 18} y1="85" x2={15 + i * 18} y2="20" stroke={ink} strokeWidth="3" />
@@ -205,7 +205,7 @@ function FacadeThumbnailSvg({ style }: { style: string }) {
     default:
       return (
         <svg viewBox="0 0 160 90" className="w-full h-full object-cover">
-          <rect width="160" height="90" fill="#efece4" />
+          <rect width="160" height="90" fill="#16212e" />
           {Array.from({ length: 8 }).map((_, i) => (
             <rect
               key={i}
